@@ -210,6 +210,21 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
     {
         var parseNodeParameter = codeElement.Parameters.OfKind(CodeParameterKind.ParseNode) ?? throw new InvalidOperationException("Factory method should have a ParseNode parameter");
 
+        // Special case: create_from_discriminator_value_with_message for error classes
+        if (codeElement.Name.Equals("create_from_discriminator_value_with_message", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
+        {
+            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
+            if (messageParam != null)
+            {
+                writer.WriteLine($"return {parentClass.Name}(message)");
+            }
+            else
+            {
+                writer.WriteLine($"return {parentClass.Name}()");
+            }
+            return;
+        }
+
         if (parentClass.DiscriminatorInformation.ShouldWriteParseNodeCheck && !parentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForIntersectionType)
         {
             writer.StartBlock("try:");
@@ -328,7 +343,14 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
     }
     private void WriteConstructorBody(CodeClass parentClass, CodeMethod currentMethod, LanguageWriter writer, bool inherits)
     {
-        if (inherits && !parentClass.IsOfKind(CodeClassKind.Model))
+        // For error classes with message constructor, pass the message to base constructor
+        if (parentClass.IsErrorDefinition &&
+            currentMethod.Parameters.Any(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase) &&
+                                             p.Type.Name.Equals("str", StringComparison.OrdinalIgnoreCase)))
+        {
+            writer.WriteLine("super().__init__(message)");
+        }
+        else if (inherits && !parentClass.IsOfKind(CodeClassKind.Model))
         {
             if (parentClass.IsOfKind(CodeClassKind.RequestBuilder) &&
             currentMethod.Parameters.OfKind(CodeParameterKind.RequestAdapter) is CodeParameter requestAdapterParameter &&
@@ -357,6 +379,11 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
             }
             else
                 writer.WriteLine("super().__init__()");
+        }
+        else if (parentClass.IsErrorDefinition)
+        {
+            // For error classes without message constructor, call super without arguments
+            writer.WriteLine("super().__init__()");
         }
         if (parentClass.IsOfKind(CodeClassKind.Model))
         {
@@ -602,7 +629,26 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
             writer.StartBlock($"{errorMappingVarName}: dict[str, type[ParsableFactory]] = {{");
             foreach (var errorMapping in codeElement.ErrorMappings)
             {
-                writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {errorMapping.Value.Name},");
+                var errorClass = errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition as CodeClass;
+
+                if (errorClass?.IsErrorDefinition == true)
+                {
+                    var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
+                    if (!string.IsNullOrEmpty(errorDescription))
+                    {
+                        var statusCodeAndDescription = $"{errorMapping.Key} {errorDescription}";
+                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": lambda parse_node: {errorMapping.Value.Name}.create_from_discriminator_value_with_message(parse_node, \"{statusCodeAndDescription}\"),");
+                    }
+                    else
+                    {
+                        // No description provided, use the original factory method
+                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {errorMapping.Value.Name},");
+                    }
+                }
+                else
+                {
+                    writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {errorMapping.Value.Name},");
+                }
             }
             writer.CloseBlock();
         }

@@ -99,6 +99,7 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                 "APIError",
                 $"{AbstractionsPackageName}.api_error"
             );
+            AddConstructorsForErrorClasses(generatedCode);
             AddGetterAndSetterMethods(generatedCode,
                 new() {
                     CodePropertyKind.Custom,
@@ -390,4 +391,117 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                         },
                     })},
     };
+
+    private static void AddConstructorsForErrorClasses(CodeElement currentElement)
+    {
+        if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
+        {
+            // Add parameterless constructor if not already present
+            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && !x.Parameters.Any()))
+            {
+                var parameterlessConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} and sets the default values.");
+                codeClass.AddMethod(parameterlessConstructor);
+            }
+
+            // Add message constructor if not already present
+            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(p => p.Type.Name.Equals("str", StringComparison.OrdinalIgnoreCase))))
+            {
+                var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
+
+                // Add message parameter (Python uses 'str' type)
+                messageConstructor.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Type = new CodeType { Name = "str", IsExternal = true },
+                    Optional = true, // Python allows optional parameters with default None
+                    DefaultValue = "None",
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The error message"
+                    }
+                });
+
+                codeClass.AddMethod(messageConstructor);
+            }
+
+            // Add message factory method if not already present
+            if (!codeClass.Methods.Any(m => m.IsOfKind(CodeMethodKind.Factory) && m.Name.Equals("create_from_discriminator_value_with_message", StringComparison.OrdinalIgnoreCase)))
+            {
+                var messageFactoryMethod = new CodeMethod
+                {
+                    Name = "create_from_discriminator_value_with_message",
+                    Kind = CodeMethodKind.Factory,
+                    IsAsync = false,
+                    IsStatic = true,
+                    Documentation = new(new() {
+                        {"TypeName", new CodeType {
+                            IsExternal = false,
+                            TypeDefinition = codeClass,
+                        }}
+                    })
+                    {
+                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
+                    },
+                    Access = AccessModifier.Public,
+                    ReturnType = new CodeType
+                    {
+                        Name = codeClass.Name,
+                        TypeDefinition = codeClass,
+                    },
+                    Parent = codeClass,
+                };
+
+                // Add parseNode parameter
+                messageFactoryMethod.AddParameter(new CodeParameter
+                {
+                    Name = "parse_node",
+                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
+                    }
+                });
+
+                // Add message parameter (Python uses 'str' type)
+                messageFactoryMethod.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Type = new CodeType { Name = "str", IsExternal = true },
+                    Optional = true,
+                    DefaultValue = "None",
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The error message to set on the created object"
+                    }
+                });
+
+                codeClass.AddMethod(messageFactoryMethod);
+            }
+        }
+        CrawlTree(currentElement, AddConstructorsForErrorClasses);
+    }
+
+    private static CodeMethod CreateConstructor(CodeClass codeClass, string descriptionTemplate)
+    {
+        return new CodeMethod
+        {
+            Name = "__init__",
+            Kind = CodeMethodKind.Constructor,
+            IsAsync = false,
+            IsStatic = false,
+            Documentation = new(new() {
+                {"TypeName", new CodeType {
+                    IsExternal = false,
+                    TypeDefinition = codeClass,
+                }}
+            })
+            {
+                DescriptionTemplate = descriptionTemplate,
+            },
+            Access = AccessModifier.Public,
+            ReturnType = new CodeType { Name = "None", IsExternal = true },
+            Parent = codeClass,
+        };
+    }
 }
