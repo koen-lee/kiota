@@ -1344,5 +1344,105 @@ components:
         await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
         Assert.Equal(isImported, model.StartBlock.Usings.Any(static x => x.Declaration.Name.Equals("strconv", StringComparison.OrdinalIgnoreCase)));
     }
+    [Fact]
+    public async Task AddsConstructorsForErrorClassesAsync()
+    {
+        var errorClass = root.AddClass(new CodeClass
+        {
+            Name = "SomeError",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = true
+        }).First();
+
+        root.AddNamespace("ApiSdk/models"); // so the interface copy refiner goes through
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
+
+        // Check that the factory methods were created for error classes
+        var parameterlessFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeError" && m.IsOfKind(CodeMethodKind.Factory));
+        var messageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        var discriminatorMessageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+
+        Assert.NotNull(parameterlessFactory);
+        Assert.NotNull(messageFactory);
+        Assert.NotNull(discriminatorMessageFactory);
+
+        // Check parameter counts
+        Assert.Empty(parameterlessFactory.Parameters);
+        Assert.Single(messageFactory.Parameters);
+        Assert.Equal(2, discriminatorMessageFactory.Parameters.Count());
+    }
+
+    [Fact]
+    public async Task DoesNotAddConstructorsForNonErrorClassesAsync()
+    {
+        var regularClass = root.AddClass(new CodeClass
+        {
+            Name = "SomeModel",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = false
+        }).First();
+
+        root.AddNamespace("ApiSdk/models"); // so the interface copy refiner goes through
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
+
+        // Should not have error-specific factory methods
+        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "NewSomeModel" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "NewSomeModelWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+    }
+
+    [Fact]
+    public async Task AddsConstructorsOnlyOnceForErrorClassesAsync()
+    {
+        var errorClass = root.AddClass(new CodeClass
+        {
+            Name = "DuplicateError",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = true
+        }).First();
+
+        // Add existing factory method to simulate already having one
+        errorClass.AddMethod(new CodeMethod
+        {
+            Name = "NewDuplicateError",
+            Kind = CodeMethodKind.Factory,
+            ReturnType = new CodeType { Name = "*DuplicateError", IsNullable = true }
+        });
+
+        root.AddNamespace("ApiSdk/models"); // so the interface copy refiner goes through
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
+
+        // Should have only one of each factory method
+        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateError" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.Single(errorClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+    }
+
+    [Fact]
+    public async Task AddsConstructorsWithCorrectDescriptionForErrorClassesAsync()
+    {
+        var errorClassWithDescription = root.AddClass(new CodeClass
+        {
+            Name = "DetailedError",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = true
+        }).First();
+
+        root.AddNamespace("ApiSdk/models"); // so the interface copy refiner goes through
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
+
+        // Check factory methods are created
+        var parameterlessFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedError" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.NotNull(parameterlessFactory);
+        Assert.NotEmpty(parameterlessFactory.Documentation.DescriptionTemplate);
+
+        var messageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.NotNull(messageFactory);
+        Assert.NotEmpty(messageFactory.Documentation.DescriptionTemplate);
+
+        var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.NotNull(discriminatorMessageFactory);
+        Assert.NotEmpty(discriminatorMessageFactory.Documentation.DescriptionTemplate);
+    }
     #endregion
 }

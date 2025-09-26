@@ -184,6 +184,7 @@ public class GoRefiner : CommonLanguageRefiner
                     "ApiError",
                     "github.com/microsoft/kiota-abstractions-go"
             );
+            AddConstructorsForErrorClasses(generatedCode);
             AddDiscriminatorMappingsUsingsToParentClasses(
                 generatedCode,
                 "ParseNode",
@@ -988,5 +989,122 @@ public class GoRefiner : CommonLanguageRefiner
             }
         }
         CrawlTree(currentElement, NormalizeNamespaceNames);
+    }
+
+    private static void AddConstructorsForErrorClasses(CodeElement currentElement)
+    {
+        if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
+        {
+            // Add parameterless factory function if not already present (Go uses New* functions instead of constructors)
+            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Factory) && x.Name.Equals("New" + codeClass.Name, StringComparison.OrdinalIgnoreCase) && !x.Parameters.Any()))
+            {
+                var parameterlessFactory = CreateFactoryMethod(codeClass, $"New{codeClass.Name}", "Instantiates a new {TypeName} and sets the default values.");
+                codeClass.AddMethod(parameterlessFactory);
+            }
+
+            // Add message factory function if not already present (Go uses NewWithMessage pattern)
+            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Factory) && x.Name.Equals($"New{codeClass.Name}WithMessage", StringComparison.OrdinalIgnoreCase)))
+            {
+                var messageFactory = CreateFactoryMethod(codeClass, $"New{codeClass.Name}WithMessage", "Instantiates a new {TypeName} with the specified error message.");
+
+                // Add message parameter (Go uses 'string' type)
+                messageFactory.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Type = new CodeType { Name = "string", IsExternal = true },
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The error message"
+                    }
+                });
+
+                codeClass.AddMethod(messageFactory);
+            }
+
+            // Add message factory method with discriminator if not already present
+            if (!codeClass.Methods.Any(m => m.IsOfKind(CodeMethodKind.Factory) && m.Name.Equals("CreateFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase)))
+            {
+                var messageFactoryMethod = new CodeMethod
+                {
+                    Name = "CreateFromDiscriminatorValueWithMessage",
+                    Kind = CodeMethodKind.Factory,
+                    IsAsync = false,
+                    IsStatic = true,
+                    Documentation = new(new() {
+                        {"TypeName", new CodeType {
+                            IsExternal = false,
+                            TypeDefinition = codeClass,
+                        }}
+                    })
+                    {
+                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
+                    },
+                    Access = AccessModifier.Public,
+                    ReturnType = new CodeType
+                    {
+                        Name = "Parsable", // Go uses Parsable interface
+                        IsExternal = true,
+                        IsNullable = false,
+                    },
+                    Parent = codeClass,
+                };
+
+                // Add parseNode parameter
+                messageFactoryMethod.AddParameter(new CodeParameter
+                {
+                    Name = "parseNode",
+                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
+                    }
+                });
+
+                // Add message parameter (Go uses 'string' type)
+                messageFactoryMethod.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Type = new CodeType { Name = "string", IsExternal = true },
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The error message to set on the created object"
+                    }
+                });
+
+                codeClass.AddMethod(messageFactoryMethod);
+            }
+        }
+        CrawlTree(currentElement, AddConstructorsForErrorClasses);
+    }
+
+    private static CodeMethod CreateFactoryMethod(CodeClass codeClass, string methodName, string descriptionTemplate)
+    {
+        return new CodeMethod
+        {
+            Name = methodName,
+            Kind = CodeMethodKind.Factory,
+            IsAsync = false,
+            IsStatic = true,
+            Documentation = new(new() {
+                {"TypeName", new CodeType {
+                    IsExternal = false,
+                    TypeDefinition = codeClass,
+                }}
+            })
+            {
+                DescriptionTemplate = descriptionTemplate,
+            },
+            Access = AccessModifier.Public,
+            ReturnType = new CodeType
+            {
+                Name = $"*{codeClass.Name}", // Go returns pointers
+                TypeDefinition = codeClass,
+                IsNullable = true // Go pointers can be nil
+            },
+            Parent = codeClass,
+        };
     }
 }
