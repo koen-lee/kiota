@@ -770,7 +770,18 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
             writer.IncreaseIndent(2);
             errorMappings.ToList().ForEach(errorMapping =>
             {
-                writer.WriteLine($"'{errorMapping.Key}' => [{errorMapping.Value.Name.ToFirstCharacterUpperCase()}::class, '{CreateDiscriminatorMethodName}'],");
+                var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
+                if (!string.IsNullOrEmpty(errorDescription))
+                {
+                    // Use enhanced factory method with description
+                    var enhancedMessage = $"{errorMapping.Key} {errorDescription}";
+                    writer.WriteLine($"'{errorMapping.Key}' => function($parseNode) {{ return {errorMapping.Value.Name.ToFirstCharacterUpperCase()}::createFromDiscriminatorValueWithMessage($parseNode, '{enhancedMessage}'); }},");
+                }
+                else
+                {
+                    // Use original factory method
+                    writer.WriteLine($"'{errorMapping.Key}' => [{errorMapping.Value.Name.ToFirstCharacterUpperCase()}::class, '{CreateDiscriminatorMethodName}'],");
+                }
             });
             writer.DecreaseIndent();
             writer.WriteLine("];");
@@ -849,6 +860,21 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
 
     private void WriteFactoryMethodBody(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
+        // Special case: CreateFromDiscriminatorValueWithMessage for error classes
+        if (codeElement.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
+        {
+            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
+            if (messageParam != null)
+            {
+                writer.WriteLine($"return new {parentClass.Name.ToFirstCharacterUpperCase()}(${messageParam.Name});");
+            }
+            else
+            {
+                writer.WriteLine($"return new {parentClass.Name.ToFirstCharacterUpperCase()}();");
+            }
+            return;
+        }
+
         switch (parentClass.Kind)
         {
             case CodeClassKind.Model:
