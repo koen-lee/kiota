@@ -261,6 +261,22 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
 
     private void WriteFactoryMethod(CodeFunction codeElement, CodeFile codeFile, LanguageWriter writer)
     {
+        // Special case: createFromDiscriminatorValueWithMessage for error classes
+        if (codeElement.OriginalLocalMethod.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) &&
+            codeElement.OriginalMethodParentClass.IsErrorDefinition)
+        {
+            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
+            if (messageParam != null)
+            {
+                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
+            }
+            else
+            {
+                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}();");
+            }
+            return;
+        }
+
         var returnType = conventions.GetTypeString(codeElement.OriginalLocalMethod.ReturnType, codeElement);
 
         if (codeElement.OriginalMethodParentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForInheritedType)

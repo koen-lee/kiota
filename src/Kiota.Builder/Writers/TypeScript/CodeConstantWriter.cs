@@ -115,7 +115,19 @@ public class CodeConstantWriter : BaseElementWriter<CodeConstant, TypeScriptConv
                 writer.StartBlock("errorMappings: {");
                 foreach (var errorMapping in executorMethod.ErrorMappings)
                 {
-                    writer.WriteLine($"{GetErrorMappingKey(errorMapping.Key)}: {GetFactoryMethodName(errorMapping.Value, codeElement, writer)} as ParsableFactory<Parsable>,");
+                    var errorDescription = executorMethod.GetErrorDescription(errorMapping.Key);
+                    if (!string.IsNullOrEmpty(errorDescription))
+                    {
+                        // Use enhanced factory method with description
+                        var enhancedMessage = $"{errorMapping.Key} {errorDescription}";
+                        var enhancedFactoryMethodName = GetFactoryMethodName(errorMapping.Value, codeElement, writer).Replace("FromDiscriminatorValue", "FromDiscriminatorValueWithMessage", StringComparison.Ordinal);
+                        writer.WriteLine($"{GetErrorMappingKey(errorMapping.Key)}: (parseNode: ParseNode) => {enhancedFactoryMethodName}(parseNode, \"{enhancedMessage}\") as ParsableFactory<Parsable>,");
+                    }
+                    else
+                    {
+                        // Use original factory method
+                        writer.WriteLine($"{GetErrorMappingKey(errorMapping.Key)}: {GetFactoryMethodName(errorMapping.Value, codeElement, writer)} as ParsableFactory<Parsable>,");
+                    }
                 }
                 writer.CloseBlock("},");
             }

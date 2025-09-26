@@ -1717,5 +1717,175 @@ public sealed class CodeFunctionWriterTests : IDisposable
         var result = tw.ToString();
         Assert.Contains("\"property\": n => { model.property = n.getByteArrayValue(); }", result, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void WritesFactoryMethodBodyForErrorClassWithMessage()
+    {
+        // Create an error class
+        var errorClass = root.AddClass(new CodeClass
+        {
+            Name = "SomeError",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = true
+        }).First();
+
+        // Create the factory method with message parameter
+        var factoryMethod = errorClass.AddMethod(new CodeMethod
+        {
+            Name = "createFromDiscriminatorValueWithMessage",
+            Kind = CodeMethodKind.Factory,
+            ReturnType = new CodeType
+            {
+                Name = "SomeError",
+                TypeDefinition = errorClass,
+                IsNullable = true
+            },
+            IsStatic = true,
+        }).First();
+
+        // Add parseNode parameter
+        factoryMethod.AddParameter(new CodeParameter
+        {
+            Name = "parseNode",
+            Kind = CodeParameterKind.ParseNode,
+            Type = new CodeType
+            {
+                Name = "ParseNode",
+                IsExternal = true,
+            },
+            Optional = false,
+        });
+
+        // Add message parameter
+        factoryMethod.AddParameter(new CodeParameter
+        {
+            Name = "message",
+            Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
+            Type = new CodeType
+            {
+                Name = "string",
+                IsExternal = true,
+            },
+            Optional = true,
+        });
+
+        var function = new CodeFunction(factoryMethod);
+        var codeFile = root.TryAddCodeFile("foo", function);
+        writer.Write(function);
+        var result = tw.ToString();
+
+        // Should call the constructor with message
+        Assert.Contains("return new SomeError(message);", result);
+        AssertExtensions.CurlyBracesAreClosed(result, 1);
+    }
+
+    [Fact]
+    public void WritesFactoryMethodBodyForErrorClassWithoutMessage()
+    {
+        // Create an error class
+        var errorClass = root.AddClass(new CodeClass
+        {
+            Name = "SomeError",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = true
+        }).First();
+
+        // Create the factory method without message parameter
+        var factoryMethod = errorClass.AddMethod(new CodeMethod
+        {
+            Name = "createFromDiscriminatorValueWithMessage",
+            Kind = CodeMethodKind.Factory,
+            ReturnType = new CodeType
+            {
+                Name = "SomeError",
+                TypeDefinition = errorClass,
+                IsNullable = true
+            },
+            IsStatic = true,
+        }).First();
+
+        // Add only parseNode parameter (no message parameter)
+        factoryMethod.AddParameter(new CodeParameter
+        {
+            Name = "parseNode",
+            Kind = CodeParameterKind.ParseNode,
+            Type = new CodeType
+            {
+                Name = "ParseNode",
+                IsExternal = true,
+            },
+            Optional = false,
+        });
+
+        var function = new CodeFunction(factoryMethod);
+        var codeFile = root.TryAddCodeFile("foo", function);
+        writer.Write(function);
+        var result = tw.ToString();
+
+        // Should call the parameterless constructor
+        Assert.Contains("return new SomeError();", result);
+        AssertExtensions.CurlyBracesAreClosed(result, 1);
+    }
+
+    [Fact]
+    public void DoesNotWriteSpecialFactoryMethodForNonErrorClasses()
+    {
+        // Create a regular class
+        var regularClass = root.AddClass(new CodeClass
+        {
+            Name = "SomeModel",
+            Kind = CodeClassKind.Model,
+            IsErrorDefinition = false
+        }).First();
+
+        // Create the factory method
+        var factoryMethod = regularClass.AddMethod(new CodeMethod
+        {
+            Name = "createFromDiscriminatorValueWithMessage",
+            Kind = CodeMethodKind.Factory,
+            ReturnType = new CodeType
+            {
+                Name = "SomeModel",
+                TypeDefinition = regularClass,
+                IsNullable = true
+            },
+            IsStatic = true,
+        }).First();
+
+        // Add parameters
+        factoryMethod.AddParameter(new CodeParameter
+        {
+            Name = "parseNode",
+            Kind = CodeParameterKind.ParseNode,
+            Type = new CodeType
+            {
+                Name = "ParseNode",
+                IsExternal = true,
+            },
+            Optional = false,
+        });
+
+        factoryMethod.AddParameter(new CodeParameter
+        {
+            Name = "message",
+            Kind = CodeParameterKind.RequestBodyContentType,
+            Type = new CodeType
+            {
+                Name = "string",
+                IsExternal = true,
+            },
+            Optional = true,
+        });
+
+        var function = new CodeFunction(factoryMethod);
+        var codeFile = root.TryAddCodeFile("foo", function);
+        writer.Write(function);
+        var result = tw.ToString();
+
+        // Should not use special error handling for non-error classes
+        Assert.DoesNotContain("new SomeModel(message)", result);
+        // Should continue with normal factory method logic - the exact output varies based on setup but should not be the error handling path
+        AssertExtensions.CurlyBracesAreClosed(result, 1);
+    }
 }
 

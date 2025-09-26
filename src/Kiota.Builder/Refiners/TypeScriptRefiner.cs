@@ -161,6 +161,7 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                     CodePropertyKind.QueryParameter,
                 ],
                 static s => s.ToCamelCase(UnderscoreArray));
+            AddConstructorsForErrorClasses(generatedCode);
             IntroducesInterfacesAndFunctions(generatedCode, factoryNameCallbackFromType);
             GenerateEnumObjects(generatedCode);
             AliasUsingsWithSameSymbol(generatedCode);
@@ -1561,5 +1562,114 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
             }
         }
         CrawlTree(codeElement, AddDeserializerUsingToDiscriminatorFactory);
+    }
+
+    private static void AddConstructorsForErrorClasses(CodeElement codeElement)
+    {
+        if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
+        {
+            // Add parameterless constructor if not exists
+            var parameterlessConstructor = codeClass.Methods.FirstOrDefault(m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any());
+            if (parameterlessConstructor == null)
+            {
+                parameterlessConstructor = new CodeMethod
+                {
+                    Name = "constructor",
+                    Kind = CodeMethodKind.Constructor,
+                    Access = AccessModifier.Public,
+                    IsAsync = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "Instantiates a new {TypeName}."
+                    },
+                    ReturnType = new CodeType { Name = "void", IsExternal = true }
+                };
+                codeClass.AddMethod(parameterlessConstructor);
+            }
+
+            // Add constructor with message parameter if not exists
+            var messageConstructor = codeClass.Methods.FirstOrDefault(m =>
+                m.IsOfKind(CodeMethodKind.Constructor) &&
+                m.Parameters.Count() == 1 &&
+                m.Parameters.Any(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase) &&
+                                    p.Type.Name.Equals("string", StringComparison.OrdinalIgnoreCase)));
+
+            if (messageConstructor == null)
+            {
+                messageConstructor = new CodeMethod
+                {
+                    Name = "constructor",
+                    Kind = CodeMethodKind.Constructor,
+                    Access = AccessModifier.Public,
+                    IsAsync = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "Instantiates a new {TypeName} with an error message."
+                    },
+                    ReturnType = new CodeType { Name = "void", IsExternal = true }
+                };
+
+                messageConstructor.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Type = new CodeType { Name = "string", IsExternal = true },
+                    Optional = true,
+                    Documentation = new() { DescriptionTemplate = "The error message" }
+                });
+
+                codeClass.AddMethod(messageConstructor);
+            }
+
+            // Add createFromDiscriminatorValueWithMessage factory method if not exists
+            var discriminatorMessageFactory = codeClass.Methods.FirstOrDefault(m =>
+                m.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) &&
+                m.IsOfKind(CodeMethodKind.Factory));
+
+            if (discriminatorMessageFactory == null)
+            {
+                discriminatorMessageFactory = new CodeMethod
+                {
+                    Name = "createFromDiscriminatorValueWithMessage",
+                    Kind = CodeMethodKind.Factory,
+                    Access = AccessModifier.Public,
+                    IsAsync = false,
+                    IsStatic = true,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with custom message."
+                    },
+                    ReturnType = new CodeType
+                    {
+                        Name = codeClass.Name,
+                        TypeDefinition = codeClass,
+                        IsNullable = true
+                    }
+                };
+
+                // Add parseNode parameter
+                discriminatorMessageFactory.AddParameter(new CodeParameter
+                {
+                    Name = "parseNode",
+                    Kind = CodeParameterKind.ParseNode,
+                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
+                    Optional = false,
+                    Documentation = new() { DescriptionTemplate = "The parse node to use to read the discriminator value and create the object" }
+                });
+
+                // Add message parameter
+                discriminatorMessageFactory.AddParameter(new CodeParameter
+                {
+                    Name = "message",
+                    Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
+                    Type = new CodeType { Name = "string", IsExternal = true },
+                    Optional = true,
+                    Documentation = new() { DescriptionTemplate = "The error message" }
+                });
+
+                codeClass.AddMethod(discriminatorMessageFactory);
+            }
+        }
+
+        CrawlTree(codeElement, AddConstructorsForErrorClasses);
     }
 }
