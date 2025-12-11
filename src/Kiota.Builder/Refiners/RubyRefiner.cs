@@ -79,6 +79,7 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
                 "MicrosoftKiotaAbstractions",
                 true
             );
+            AddConstructorsForErrorClasses(generatedCode);
             ReplaceReservedNames(generatedCode, reservedNamesProvider, x => $"{x}_escaped");
             AddGetterAndSetterMethods(generatedCode,
                 [
@@ -335,5 +336,94 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
             .Where(static x => "IAdditionalDataHolder".Equals(x.Name, StringComparison.OrdinalIgnoreCase))
             .ToList()
             .ForEach(static x => x.Name = "MicrosoftKiotaAbstractions::AdditionalDataHolder");
+    }
+
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "String", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = true,
+            DefaultValue = "nil",
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
+    private static void AddConstructorsForErrorClasses(CodeElement currentElement)
+    {
+        if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
+        {
+            // Add initialize method (Ruby's constructor) with message parameter if not exists
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
+            {
+                var messageConstructor = new CodeMethod
+                {
+                    Name = "initialize",
+                    Kind = CodeMethodKind.Constructor,
+                    Access = AccessModifier.Public,
+                    IsAsync = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "Instantiates a new {TypeName} with an optional error message."
+                    },
+                    ReturnType = new CodeType { Name = "void", IsExternal = true }
+                };
+                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                codeClass.AddMethod(messageConstructor);
+            }
+
+            // Add message factory method if not already present
+            const string MethodName = "create_from_discriminator_value_with_message";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
+            {
+                var messageFactoryMethod = new CodeMethod
+                {
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
+                    IsAsync = false,
+                    IsStatic = true,
+                    Documentation = new(new() {
+                        {"TypeName", new CodeType {
+                            IsExternal = false,
+                            TypeDefinition = codeClass,
+                        }}
+                    })
+                    {
+                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
+                    },
+                    Access = AccessModifier.Public,
+                    ReturnType = new CodeType
+                    {
+                        Name = codeClass.Name,
+                        TypeDefinition = codeClass,
+                    },
+                    Parent = codeClass,
+                };
+
+                // Add parseNode parameter
+                messageFactoryMethod.AddParameter(new CodeParameter
+                {
+                    Name = "parse_node",
+                    Kind = CodeParameterKind.ParseNode,
+                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
+                    }
+                });
+
+                // Add message parameter
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+
+                codeClass.AddMethod(messageFactoryMethod);
+            }
+        }
+        CrawlTree(currentElement, AddConstructorsForErrorClasses);
     }
 }
