@@ -554,44 +554,48 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
         CrawlTree(currentElement, x => AddQueryParameterExtractorMethod(x, methodName));
     }
 
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "String", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = false,
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
             // Add parameterless constructor if not already present
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && !x.Parameters.Any()))
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && !x.Parameters.Any()))
             {
                 var parameterlessConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} and sets the default values.");
                 codeClass.AddMethod(parameterlessConstructor);
             }
 
             // Add message constructor if not already present
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(p => p.Type.Name.Equals("String", StringComparison.OrdinalIgnoreCase))))
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-
-                // Add message parameter
-                messageConstructor.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "String", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message"
-                    }
-                });
-
+                messageConstructor.AddParameter(CreateErrorMessageParameter());
                 codeClass.AddMethod(messageConstructor);
             }
 
             // Add message factory method if not already present
-            if (!codeClass.Methods.Any(m => m.IsOfKind(CodeMethodKind.Factory) && m.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase)))
+            const string MethodName = "createFromDiscriminatorValueWithMessage";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
             {
                 var messageFactoryMethod = new CodeMethod
                 {
-                    Name = "createFromDiscriminatorValueWithMessage",
-                    Kind = CodeMethodKind.Factory,
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
                     IsAsync = false,
                     IsStatic = true,
                     Documentation = new(new() {
@@ -616,6 +620,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
                 messageFactoryMethod.AddParameter(new CodeParameter
                 {
                     Name = "parseNode",
+                    Kind = CodeParameterKind.ParseNode,
                     Type = new CodeType { Name = "ParseNode", IsExternal = true },
                     Optional = false,
                     Documentation = new()
@@ -625,16 +630,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "String", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message to set on the created object"
-                    }
-                });
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }
