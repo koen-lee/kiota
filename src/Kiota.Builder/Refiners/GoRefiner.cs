@@ -991,44 +991,49 @@ public class GoRefiner : CommonLanguageRefiner
         CrawlTree(currentElement, NormalizeNamespaceNames);
     }
 
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "string", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = false,
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
             // Add parameterless factory function if not already present (Go uses New* functions instead of constructors)
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Factory) && x.Name.Equals("New" + codeClass.Name, StringComparison.OrdinalIgnoreCase) && !x.Parameters.Any()))
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Factory) && x.Name.StartsWith("New", StringComparison.OrdinalIgnoreCase) && !x.Parameters.Any()))
             {
                 var parameterlessFactory = CreateFactoryMethod(codeClass, $"New{codeClass.Name}", "Instantiates a new {TypeName} and sets the default values.");
                 codeClass.AddMethod(parameterlessFactory);
             }
 
             // Add message factory function if not already present (Go uses NewWithMessage pattern)
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Factory) && x.Name.Equals($"New{codeClass.Name}WithMessage", StringComparison.OrdinalIgnoreCase)))
+            var messageFactoryName = $"New{codeClass.Name}WithMessage";
+            if (!codeClass.Methods.Any(x => x.Name.Equals(messageFactoryName, StringComparison.Ordinal)))
             {
-                var messageFactory = CreateFactoryMethod(codeClass, $"New{codeClass.Name}WithMessage", "Instantiates a new {TypeName} with the specified error message.");
-
-                // Add message parameter (Go uses 'string' type)
-                messageFactory.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message"
-                    }
-                });
-
+                var messageFactory = CreateFactoryMethod(codeClass, messageFactoryName, "Instantiates a new {TypeName} with the specified error message.");
+                messageFactory.AddParameter(CreateErrorMessageParameter());
                 codeClass.AddMethod(messageFactory);
             }
 
             // Add message factory method with discriminator if not already present
-            if (!codeClass.Methods.Any(m => m.IsOfKind(CodeMethodKind.Factory) && m.Name.Equals("CreateFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase)))
+            const string MethodName = "CreateFromDiscriminatorValueWithMessage";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
             {
                 var messageFactoryMethod = new CodeMethod
                 {
-                    Name = "CreateFromDiscriminatorValueWithMessage",
-                    Kind = CodeMethodKind.Factory,
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
                     IsAsync = false,
                     IsStatic = true,
                     Documentation = new(new() {
@@ -1054,6 +1059,7 @@ public class GoRefiner : CommonLanguageRefiner
                 messageFactoryMethod.AddParameter(new CodeParameter
                 {
                     Name = "parseNode",
+                    Kind = CodeParameterKind.ParseNode,
                     Type = new CodeType { Name = "ParseNode", IsExternal = true },
                     Optional = false,
                     Documentation = new()
@@ -1062,17 +1068,8 @@ public class GoRefiner : CommonLanguageRefiner
                     }
                 });
 
-                // Add message parameter (Go uses 'string' type)
-                messageFactoryMethod.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message to set on the created object"
-                    }
-                });
+                // Add message parameter
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

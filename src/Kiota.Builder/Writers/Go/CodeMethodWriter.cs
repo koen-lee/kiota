@@ -81,6 +81,9 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             case CodeMethodKind.Factory:
                 WriteFactoryMethodBody(codeElement, parentClass, writer);
                 break;
+            case CodeMethodKind.FactoryWithErrorMessage:
+                WriteFactoryMethodBodyForErrorClassWithMessage(codeElement, parentClass, writer);
+                break;
             case CodeMethodKind.ComposedTypeMarker:
                 WriteComposedTypeMarkerBody(writer);
                 break;
@@ -114,24 +117,15 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
     {
         writer.WriteLine("return true");
     }
+    private void WriteFactoryMethodBodyForErrorClassWithMessage(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
+    {
+        var messageParam = codeElement.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) ?? throw new InvalidOperationException($"FactoryWithErrorMessage should have a message parameter");
+        writer.WriteLine($"return New{parentClass.Name}WithMessage({messageParam.Name}), nil");
+    }
+
     private void WriteFactoryMethodBody(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
         var parseNodeParameter = codeElement.Parameters.OfKind(CodeParameterKind.ParseNode) ?? throw new InvalidOperationException("Factory method should have a ParseNode parameter");
-
-        // Special case: CreateFromDiscriminatorValueWithMessage for error classes
-        if (codeElement.Name.Equals("CreateFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
-        {
-            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
-            if (messageParam != null)
-            {
-                writer.WriteLine($"return New{parentClass.Name}WithMessage({messageParam.Name}), nil");
-            }
-            else
-            {
-                writer.WriteLine($"return New{parentClass.Name}(), nil");
-            }
-            return;
-        }
 
         if (parentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForUnionType || parentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForIntersectionType)
             writer.WriteLine($"{ResultVarName} := New{parentClass.Name.ToFirstCharacterUpperCase()}()");
@@ -815,25 +809,17 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             writer.IncreaseIndent();
             foreach (var errorMapping in codeElement.ErrorMappings)
             {
-                var errorClass = errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition as CodeClass;
+                if (!(errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition is CodeClass errorClass)) continue;
+                var errorKey = errorMapping.Key.ToUpperInvariant();
+                var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
 
-                if (errorClass?.IsErrorDefinition == true)
+                if (!string.IsNullOrEmpty(errorDescription) && errorClass.IsErrorDefinition)
                 {
-                    var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
-                    if (!string.IsNullOrEmpty(errorDescription))
-                    {
-                        var statusCodeAndDescription = $"{errorMapping.Key} {errorDescription}";
-                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": func(parseNode {conventions.SerializationHash}.ParseNode) error {{ return {conventions.GetTypeString(errorMapping.Value, parentClass, false, false, false)}.CreateFromDiscriminatorValueWithMessage(parseNode, \"{statusCodeAndDescription}\") }},");
-                    }
-                    else
-                    {
-                        // No description provided, use the original factory method
-                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {conventions.GetImportedStaticMethodName(errorMapping.Value, parentClass, "Create", "FromDiscriminatorValue", "able")},");
-                    }
+                    writer.WriteLine($"\"{errorKey}\": func(parseNode {conventions.SerializationHash}.ParseNode) error {{ return {conventions.GetTypeString(errorMapping.Value, parentClass, false, false, false)}.CreateFromDiscriminatorValueWithMessage(parseNode, \"{errorDescription}\") }},");
                 }
                 else
                 {
-                    writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {conventions.GetImportedStaticMethodName(errorMapping.Value, parentClass, "Create", "FromDiscriminatorValue", "able")},");
+                    writer.WriteLine($"\"{errorKey}\": {conventions.GetImportedStaticMethodName(errorMapping.Value, parentClass, "Create", "FromDiscriminatorValue", "able")},");
                 }
             }
             writer.CloseBlock();
