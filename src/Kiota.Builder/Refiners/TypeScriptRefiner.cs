@@ -1564,15 +1564,29 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
         CrawlTree(codeElement, AddDeserializerUsingToDiscriminatorFactory);
     }
 
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "string", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = true,
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
     private static void AddConstructorsForErrorClasses(CodeElement codeElement)
     {
         if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
             // Add parameterless constructor if not exists
-            var parameterlessConstructor = codeClass.Methods.FirstOrDefault(m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any());
-            if (parameterlessConstructor == null)
+            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any()))
             {
-                parameterlessConstructor = new CodeMethod
+                var parameterlessConstructor = new CodeMethod
                 {
                     Name = "constructor",
                     Kind = CodeMethodKind.Constructor,
@@ -1588,15 +1602,9 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
             }
 
             // Add constructor with message parameter if not exists
-            var messageConstructor = codeClass.Methods.FirstOrDefault(m =>
-                m.IsOfKind(CodeMethodKind.Constructor) &&
-                m.Parameters.Count() == 1 &&
-                m.Parameters.Any(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase) &&
-                                    p.Type.Name.Equals("string", StringComparison.OrdinalIgnoreCase)));
-
-            if (messageConstructor == null)
+            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
-                messageConstructor = new CodeMethod
+                var messageConstructor = new CodeMethod
                 {
                     Name = "constructor",
                     Kind = CodeMethodKind.Constructor,
@@ -1608,29 +1616,18 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-
-                messageConstructor.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = true,
-                    Documentation = new() { DescriptionTemplate = "The error message" }
-                });
-
+                messageConstructor.AddParameter(CreateErrorMessageParameter());
                 codeClass.AddMethod(messageConstructor);
             }
 
             // Add createFromDiscriminatorValueWithMessage factory method if not exists
-            var discriminatorMessageFactory = codeClass.Methods.FirstOrDefault(m =>
-                m.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) &&
-                m.IsOfKind(CodeMethodKind.Factory));
-
-            if (discriminatorMessageFactory == null)
+            const string MethodName = "createFromDiscriminatorValueWithMessage";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
             {
-                discriminatorMessageFactory = new CodeMethod
+                var discriminatorMessageFactory = new CodeMethod
                 {
-                    Name = "createFromDiscriminatorValueWithMessage",
-                    Kind = CodeMethodKind.Factory,
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
                     Access = AccessModifier.Public,
                     IsAsync = false,
                     IsStatic = true,
@@ -1657,14 +1654,7 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                discriminatorMessageFactory.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = true,
-                    Documentation = new() { DescriptionTemplate = "The error message" }
-                });
+                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
 
                 codeClass.AddMethod(discriminatorMessageFactory);
             }

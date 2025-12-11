@@ -115,18 +115,18 @@ public class CodeConstantWriter : BaseElementWriter<CodeConstant, TypeScriptConv
                 writer.StartBlock("errorMappings: {");
                 foreach (var errorMapping in executorMethod.ErrorMappings)
                 {
+                    if (!(errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition is CodeClass errorClass)) continue;
+                    var errorKey = GetErrorMappingKey(errorMapping.Key);
                     var errorDescription = executorMethod.GetErrorDescription(errorMapping.Key);
-                    if (!string.IsNullOrEmpty(errorDescription))
+
+                    if (!string.IsNullOrEmpty(errorDescription) && errorClass.IsErrorDefinition)
                     {
-                        // Use enhanced factory method with description
-                        var enhancedMessage = $"{errorMapping.Key} {errorDescription}";
                         var enhancedFactoryMethodName = GetFactoryMethodName(errorMapping.Value, codeElement, writer).Replace("FromDiscriminatorValue", "FromDiscriminatorValueWithMessage", StringComparison.Ordinal);
-                        writer.WriteLine($"{GetErrorMappingKey(errorMapping.Key)}: (parseNode: ParseNode) => {enhancedFactoryMethodName}(parseNode, \"{enhancedMessage}\") as ParsableFactory<Parsable>,");
+                        writer.WriteLine($"{errorKey}: (parseNode: ParseNode) => {enhancedFactoryMethodName}(parseNode, \"{errorDescription}\") as ParsableFactory<Parsable>,");
                     }
                     else
                     {
-                        // Use original factory method
-                        writer.WriteLine($"{GetErrorMappingKey(errorMapping.Key)}: {GetFactoryMethodName(errorMapping.Value, codeElement, writer)} as ParsableFactory<Parsable>,");
+                        writer.WriteLine($"{errorKey}: {GetFactoryMethodName(errorMapping.Value, codeElement, writer)} as ParsableFactory<Parsable>,");
                     }
                 }
                 writer.CloseBlock("},");

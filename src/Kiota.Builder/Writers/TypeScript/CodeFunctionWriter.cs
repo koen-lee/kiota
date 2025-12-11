@@ -261,19 +261,11 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
 
     private void WriteFactoryMethod(CodeFunction codeElement, CodeFile codeFile, LanguageWriter writer)
     {
-        // Special case: createFromDiscriminatorValueWithMessage for error classes
-        if (codeElement.OriginalLocalMethod.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) &&
-            codeElement.OriginalMethodParentClass.IsErrorDefinition)
+        // Special case: FactoryWithErrorMessage for error classes
+        if (codeElement.OriginalLocalMethod.IsOfKind(CodeMethodKind.FactoryWithErrorMessage))
         {
-            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
-            if (messageParam != null)
-            {
-                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
-            }
-            else
-            {
-                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}();");
-            }
+            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) ?? throw new InvalidOperationException($"FactoryWithErrorMessage should have a message parameter");
+            writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
             return;
         }
 
