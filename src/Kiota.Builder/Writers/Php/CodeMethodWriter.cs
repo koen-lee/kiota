@@ -78,6 +78,9 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
             case CodeMethodKind.Factory:
                 WriteFactoryMethodBody(codeElement, parentClass, writer);
                 break;
+            case CodeMethodKind.FactoryWithErrorMessage:
+                WriteFactoryMethodBodyForErrorClassWithMessage(codeElement, parentClass, writer);
+                break;
         }
         writer.CloseBlock();
         writer.WriteLine();
@@ -770,17 +773,17 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
             writer.IncreaseIndent(2);
             errorMappings.ToList().ForEach(errorMapping =>
             {
+                if (!(errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition is CodeClass errorClass)) return;
+                var typeName = errorMapping.Value.Name.ToFirstCharacterUpperCase();
                 var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
-                if (!string.IsNullOrEmpty(errorDescription))
+
+                if (!string.IsNullOrEmpty(errorDescription) && errorClass.IsErrorDefinition)
                 {
-                    // Use enhanced factory method with description
-                    var enhancedMessage = $"{errorMapping.Key} {errorDescription}";
-                    writer.WriteLine($"'{errorMapping.Key}' => function($parseNode) {{ return {errorMapping.Value.Name.ToFirstCharacterUpperCase()}::createFromDiscriminatorValueWithMessage($parseNode, '{enhancedMessage}'); }},");
+                    writer.WriteLine($"'{errorMapping.Key}' => function($parseNode) {{ return {typeName}::createFromDiscriminatorValueWithMessage($parseNode, '{errorDescription}'); }},");
                 }
                 else
                 {
-                    // Use original factory method
-                    writer.WriteLine($"'{errorMapping.Key}' => [{errorMapping.Value.Name.ToFirstCharacterUpperCase()}::class, '{CreateDiscriminatorMethodName}'],");
+                    writer.WriteLine($"'{errorMapping.Key}' => [{typeName}::class, '{CreateDiscriminatorMethodName}'],");
                 }
             });
             writer.DecreaseIndent();
@@ -858,23 +861,14 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
     private const string DiscriminatorMappingVarName = "$mappingValue";
     private const string ResultVarName = "$result";
 
+    private void WriteFactoryMethodBodyForErrorClassWithMessage(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
+    {
+        var messageParam = codeElement.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) ?? throw new InvalidOperationException($"FactoryWithErrorMessage should have a message parameter");
+        writer.WriteLine($"return new {parentClass.Name.ToFirstCharacterUpperCase()}(${messageParam.Name});");
+    }
+
     private void WriteFactoryMethodBody(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
-        // Special case: CreateFromDiscriminatorValueWithMessage for error classes
-        if (codeElement.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
-        {
-            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
-            if (messageParam != null)
-            {
-                writer.WriteLine($"return new {parentClass.Name.ToFirstCharacterUpperCase()}(${messageParam.Name});");
-            }
-            else
-            {
-                writer.WriteLine($"return new {parentClass.Name.ToFirstCharacterUpperCase()}();");
-            }
-            return;
-        }
-
         switch (parentClass.Kind)
         {
             case CodeClassKind.Model:

@@ -473,15 +473,29 @@ public class PhpRefiner : CommonLanguageRefiner
         CrawlTree(codeElement, AddQueryParameterFactoryMethod);
     }
 
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "string", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = false,
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
     private static void AddConstructorsForErrorClasses(CodeElement codeElement)
     {
         if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
             // Add parameterless constructor if not exists
-            var parameterlessConstructor = codeClass.Methods.FirstOrDefault(m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any());
-            if (parameterlessConstructor == null)
+            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any()))
             {
-                parameterlessConstructor = new CodeMethod
+                var parameterlessConstructor = new CodeMethod
                 {
                     Name = "__construct",
                     Kind = CodeMethodKind.Constructor,
@@ -497,15 +511,9 @@ public class PhpRefiner : CommonLanguageRefiner
             }
 
             // Add constructor with message parameter if not exists
-            var messageConstructor = codeClass.Methods.FirstOrDefault(m =>
-                m.IsOfKind(CodeMethodKind.Constructor) &&
-                m.Parameters.Count() == 1 &&
-                m.Parameters.Any(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase) &&
-                                    p.Type.Name.Equals("string", StringComparison.OrdinalIgnoreCase)));
-
-            if (messageConstructor == null)
+            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
-                messageConstructor = new CodeMethod
+                var messageConstructor = new CodeMethod
                 {
                     Name = "__construct",
                     Kind = CodeMethodKind.Constructor,
@@ -517,29 +525,18 @@ public class PhpRefiner : CommonLanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-
-                messageConstructor.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = false,
-                    Documentation = new() { DescriptionTemplate = "The error message" }
-                });
-
+                messageConstructor.AddParameter(CreateErrorMessageParameter());
                 codeClass.AddMethod(messageConstructor);
             }
 
             // Add CreateFromDiscriminatorValueWithMessage factory method if not exists
-            var discriminatorMessageFactory = codeClass.Methods.FirstOrDefault(m =>
-                m.Name.Equals("CreateFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) &&
-                m.IsOfKind(CodeMethodKind.Factory));
-
-            if (discriminatorMessageFactory == null)
+            const string MethodName = "createFromDiscriminatorValueWithMessage";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
             {
-                discriminatorMessageFactory = new CodeMethod
+                var discriminatorMessageFactory = new CodeMethod
                 {
-                    Name = "createFromDiscriminatorValueWithMessage",
-                    Kind = CodeMethodKind.Factory,
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
                     Access = AccessModifier.Public,
                     IsAsync = false,
                     IsStatic = true,
@@ -566,14 +563,7 @@ public class PhpRefiner : CommonLanguageRefiner
                 });
 
                 // Add message parameter
-                discriminatorMessageFactory.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
-                    Type = new CodeType { Name = "string", IsExternal = true },
-                    Optional = false,
-                    Documentation = new() { DescriptionTemplate = "The error message" }
-                });
+                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
 
                 codeClass.AddMethod(discriminatorMessageFactory);
             }
