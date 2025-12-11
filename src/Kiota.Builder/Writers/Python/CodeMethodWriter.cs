@@ -101,6 +101,10 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
                 WriteFactoryMethodBody(codeElement, parentClass, writer);
                 writer.CloseBlock(string.Empty);
                 break;
+            case CodeMethodKind.FactoryWithErrorMessage:
+                WriteFactoryMethodBodyForErrorClassWithMessage(codeElement, parentClass, writer);
+                writer.CloseBlock(string.Empty);
+                break;
             case CodeMethodKind.ComposedTypeMarker:
                 throw new InvalidOperationException("ComposedTypeMarker is not required as interface is explicitly implemented.");
             case CodeMethodKind.RawUrlConstructor:
@@ -206,24 +210,15 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
         }
         writer.WriteLine($"return {ResultVarName}");
     }
+    private void WriteFactoryMethodBodyForErrorClassWithMessage(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
+    {
+        var messageParam = codeElement.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) ?? throw new InvalidOperationException($"FactoryWithErrorMessage should have a message parameter");
+        writer.WriteLine($"return {parentClass.Name}(message)");
+    }
+
     private void WriteFactoryMethodBody(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
         var parseNodeParameter = codeElement.Parameters.OfKind(CodeParameterKind.ParseNode) ?? throw new InvalidOperationException("Factory method should have a ParseNode parameter");
-
-        // Special case: create_from_discriminator_value_with_message for error classes
-        if (codeElement.Name.Equals("create_from_discriminator_value_with_message", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
-        {
-            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
-            if (messageParam != null)
-            {
-                writer.WriteLine($"return {parentClass.Name}(message)");
-            }
-            else
-            {
-                writer.WriteLine($"return {parentClass.Name}()");
-            }
-            return;
-        }
 
         if (parentClass.DiscriminatorInformation.ShouldWriteParseNodeCheck && !parentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForIntersectionType)
         {
@@ -629,25 +624,18 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
             writer.StartBlock($"{errorMappingVarName}: dict[str, type[ParsableFactory]] = {{");
             foreach (var errorMapping in codeElement.ErrorMappings)
             {
-                var errorClass = errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition as CodeClass;
+                if (!(errorMapping.Value.AllTypes.FirstOrDefault()?.TypeDefinition is CodeClass errorClass)) continue;
+                var typeName = errorMapping.Value.Name;
+                var errorKey = errorMapping.Key.ToUpperInvariant();
+                var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
 
-                if (errorClass?.IsErrorDefinition == true)
+                if (!string.IsNullOrEmpty(errorDescription) && errorClass.IsErrorDefinition)
                 {
-                    var errorDescription = codeElement.GetErrorDescription(errorMapping.Key);
-                    if (!string.IsNullOrEmpty(errorDescription))
-                    {
-                        var statusCodeAndDescription = $"{errorMapping.Key} {errorDescription}";
-                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": lambda parse_node: {errorMapping.Value.Name}.create_from_discriminator_value_with_message(parse_node, \"{statusCodeAndDescription}\"),");
-                    }
-                    else
-                    {
-                        // No description provided, use the original factory method
-                        writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {errorMapping.Value.Name},");
-                    }
+                    writer.WriteLine($"\"{errorKey}\": lambda parse_node: {typeName}.create_from_discriminator_value_with_message(parse_node, \"{errorDescription}\"),");
                 }
                 else
                 {
-                    writer.WriteLine($"\"{errorMapping.Key.ToUpperInvariant()}\": {errorMapping.Value.Name},");
+                    writer.WriteLine($"\"{errorKey}\": {typeName},");
                 }
             }
             writer.CloseBlock();

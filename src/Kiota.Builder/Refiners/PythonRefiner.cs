@@ -392,45 +392,49 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                     })},
     };
 
+    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
+    {
+        return new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = "str", IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = true, // Python allows optional parameters with default None
+            DefaultValue = "None",
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+    }
+
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
             // Add parameterless constructor if not already present
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && !x.Parameters.Any()))
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && !x.Parameters.Any()))
             {
                 var parameterlessConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} and sets the default values.");
                 codeClass.AddMethod(parameterlessConstructor);
             }
 
             // Add message constructor if not already present
-            if (!codeClass.Methods.Any(x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(p => p.Type.Name.Equals("str", StringComparison.OrdinalIgnoreCase))))
+            if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-
-                // Add message parameter (Python uses 'str' type)
-                messageConstructor.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "str", IsExternal = true },
-                    Optional = true, // Python allows optional parameters with default None
-                    DefaultValue = "None",
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message"
-                    }
-                });
-
+                messageConstructor.AddParameter(CreateErrorMessageParameter());
                 codeClass.AddMethod(messageConstructor);
             }
 
             // Add message factory method if not already present
-            if (!codeClass.Methods.Any(m => m.IsOfKind(CodeMethodKind.Factory) && m.Name.Equals("create_from_discriminator_value_with_message", StringComparison.OrdinalIgnoreCase)))
+            const string MethodName = "create_from_discriminator_value_with_message";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
             {
                 var messageFactoryMethod = new CodeMethod
                 {
-                    Name = "create_from_discriminator_value_with_message",
-                    Kind = CodeMethodKind.Factory,
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
                     IsAsync = false,
                     IsStatic = true,
                     Documentation = new(new() {
@@ -455,6 +459,7 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                 messageFactoryMethod.AddParameter(new CodeParameter
                 {
                     Name = "parse_node",
+                    Kind = CodeParameterKind.ParseNode,
                     Type = new CodeType { Name = "ParseNode", IsExternal = true },
                     Optional = false,
                     Documentation = new()
@@ -463,18 +468,8 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                     }
                 });
 
-                // Add message parameter (Python uses 'str' type)
-                messageFactoryMethod.AddParameter(new CodeParameter
-                {
-                    Name = "message",
-                    Type = new CodeType { Name = "str", IsExternal = true },
-                    Optional = true,
-                    DefaultValue = "None",
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The error message to set on the created object"
-                    }
-                });
+                // Add message parameter
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }
