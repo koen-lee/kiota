@@ -123,8 +123,10 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, DartConventionServ
             case CodeMethodKind.CommandBuilder:
                 throw new InvalidOperationException("CommandBuilder methods are not implemented in this SDK. They're currently only supported in the shell language.");
             case CodeMethodKind.Factory:
-            case CodeMethodKind.FactoryWithErrorMessage:
                 WriteFactoryMethodBody(codeElement, parentClass, writer);
+                break;
+            case CodeMethodKind.FactoryWithErrorMessage:
+                WriteFactoryMethodBodyForErrorClassWithMessage(codeElement, parentClass, writer);
                 break;
             case CodeMethodKind.Custom:
                 WriteCustomMethodBody(codeElement, parentClass, writer);
@@ -231,53 +233,28 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, DartConventionServ
     }
 
     private const string DiscriminatorMappingVarName = "mappingValue";
+    private void WriteFactoryMethodBodyForErrorClassWithMessage(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
+    {
+        var messageParam = codeElement.Parameters.OfKind(CodeParameterKind.ErrorMessage);
+        if (messageParam != null)
+        {
+            if (parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.AdditionalData)).Any() && !parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.BackingStore)).Any())
+            {
+                writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name}, additionalData: {{}});");
+            }
+            else
+            {
+                writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name});");
+            }
+        }
+        else
+        {
+            writer.WriteLine($"return {parentClass.Name}();");
+        }
+    }
+
     private void WriteFactoryMethodBody(CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
-        // Special case: FactoryWithErrorMessage for error classes
-        if (codeElement.IsOfKind(CodeMethodKind.FactoryWithErrorMessage))
-        {
-            var messageParam = codeElement.Parameters.OfKind(CodeParameterKind.ErrorMessage);
-            if (messageParam != null)
-            {
-                if (parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.AdditionalData)).Any() && !parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.BackingStore)).Any())
-                {
-                    writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name}, additionalData: {{}});");
-                }
-                else
-                {
-                    writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name});");
-                }
-            }
-            else
-            {
-                writer.WriteLine($"return {parentClass.Name}();");
-            }
-            return;
-        }
-
-        // Special case: createFromDiscriminatorValueWithMessage for error classes (Dart specific pattern)
-        // This is a Factory method with BOTH parseNode and message parameters
-        if (codeElement.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase) && parentClass.IsErrorDefinition)
-        {
-            var messageParam = codeElement.Parameters.FirstOrDefault(p => p.Name.Equals("message", StringComparison.OrdinalIgnoreCase));
-            if (messageParam != null)
-            {
-                if (parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.AdditionalData)).Any() && !parentClass.Properties.Where(static x => x.IsOfKind(CodePropertyKind.BackingStore)).Any())
-                {
-                    writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name}, additionalData: {{}});");
-                }
-                else
-                {
-                    writer.WriteLine($"return {parentClass.Name}(message: {messageParam.Name});");
-                }
-            }
-            else
-            {
-                writer.WriteLine($"return {parentClass.Name}();");
-            }
-            return;
-        }
-
         var parseNodeParameter = codeElement.Parameters.OfKind(CodeParameterKind.ParseNode) ?? throw new InvalidOperationException("Factory method should have a ParseNode parameter");
 
         if (parentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForInheritedType)

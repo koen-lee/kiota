@@ -118,8 +118,10 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
                 WriteSerializerFunction(codeElement, writer);
                 break;
             case CodeMethodKind.Factory:
-            case CodeMethodKind.FactoryWithErrorMessage:
                 WriteFactoryMethod(codeElement, codeFile, writer);
+                break;
+            case CodeMethodKind.FactoryWithErrorMessage:
+                WriteFactoryMethodForErrorClassWithMessage(codeElement, writer);
                 break;
             case CodeMethodKind.ClientConstructor:
                 WriteApiConstructorBody(parentFile, codeMethod, writer);
@@ -333,23 +335,21 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
                 writer.WriteLine($"{objectName}.{methodName}({module}{(additionalParam != null && additionalParam.Length > 0 ? ", " + string.Join(", ", additionalParam) : string.Empty)});");
     }
 
+    private void WriteFactoryMethodForErrorClassWithMessage(CodeFunction codeElement, LanguageWriter writer)
+    {
+        var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage));
+        if (messageParam != null)
+        {
+            writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
+        }
+        else
+        {
+            writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}();");
+        }
+    }
+
     private void WriteFactoryMethod(CodeFunction codeElement, CodeFile codeFile, LanguageWriter writer)
     {
-        // Special case: FactoryWithErrorMessage for error classes
-        if (codeElement.OriginalLocalMethod.IsOfKind(CodeMethodKind.FactoryWithErrorMessage))
-        {
-            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage));
-            if (messageParam != null)
-            {
-                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
-            }
-            else
-            {
-                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}();");
-            }
-            return;
-        }
-
         var returnType = conventions.GetTypeString(codeElement.OriginalLocalMethod.ReturnType, codeElement);
 
         if (codeElement.OriginalMethodParentClass.DiscriminatorInformation.ShouldWriteDiscriminatorForInheritedType)
