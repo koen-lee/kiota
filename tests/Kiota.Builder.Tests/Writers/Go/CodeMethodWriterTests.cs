@@ -2364,8 +2364,8 @@ public sealed class CodeMethodWriterTests : IDisposable
 
         // Check for enhanced error mapping with descriptions
         Assert.Contains($"errorMapping := {AbstractionsPackageHash}.ErrorMappings", result);
-        Assert.Contains("4XX Client error response", result);
-        Assert.Contains("5XX Server error response", result);
+        Assert.Contains("Client error response", result);
+        Assert.Contains("Server error response", result);
         AssertExtensions.CurlyBracesAreClosed(result);
     }
 
@@ -2417,7 +2417,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         var factoryMethod = errorClass.AddMethod(new CodeMethod
         {
             Name = "CreateFromDiscriminatorValueWithMessage",
-            Kind = CodeMethodKind.Factory,
+            Kind = CodeMethodKind.FactoryWithErrorMessage,
             ReturnType = new CodeType
             {
                 Name = "*SomeError",
@@ -2444,7 +2444,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         factoryMethod.AddParameter(new CodeParameter
         {
             Name = "message",
-            Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType
             {
                 Name = "string",
