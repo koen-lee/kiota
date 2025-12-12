@@ -2321,8 +2321,8 @@ public sealed class CodeMethodWriterTests : IDisposable
         writer.Write(method);
         var result = tw.ToString();
         Assert.Contains("error_mapping: dict[str, type[ParsableFactory]] = {", result);
-        Assert.Contains("\"4XX\": lambda parse_node: Error4XX.create_from_discriminator_value_with_message(parse_node, \"4XX Client Error\"),", result);
-        Assert.Contains("\"401\": lambda parse_node: Error401.create_from_discriminator_value_with_message(parse_node, \"401 Unauthorized\"),", result);
+        Assert.Contains("\"4XX\": lambda parse_node: Error4XX.create_from_discriminator_value_with_message(parse_node, \"Client Error\"),", result);
+        Assert.Contains("\"401\": lambda parse_node: Error401.create_from_discriminator_value_with_message(parse_node, \"Unauthorized\"),", result);
     }
 
     [Fact]
@@ -2350,7 +2350,7 @@ public sealed class CodeMethodWriterTests : IDisposable
     {
         setup();
         parentClass.IsErrorDefinition = true;
-        method.Kind = CodeMethodKind.Factory;
+        method.Kind = CodeMethodKind.FactoryWithErrorMessage;
         method.Name = "create_from_discriminator_value_with_message";
         method.IsStatic = true;
         method.AddParameter(new CodeParameter
@@ -2362,6 +2362,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         method.AddParameter(new CodeParameter
         {
             Name = "message",
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType { Name = "str", IsExternal = true }
         });
         writer.Write(method);

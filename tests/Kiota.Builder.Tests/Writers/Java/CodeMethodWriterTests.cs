@@ -2215,8 +2215,8 @@ public sealed class CodeMethodWriterTests : IDisposable
         writer.Write(method);
         var result = tw.ToString();
         Assert.Contains("final HashMap<String, ParsableFactory<? extends Parsable>> errorMapping", result);
-        Assert.Contains("(parseNode) -> Error4XX.createFromDiscriminatorValueWithMessage(parseNode, \"4XX Client Error\")", result);
-        Assert.Contains("(parseNode) -> Error401.createFromDiscriminatorValueWithMessage(parseNode, \"401 Unauthorized\")", result);
+        Assert.Contains("(parseNode) -> Error4XX.createFromDiscriminatorValueWithMessage(parseNode, \"Client Error\")", result);
+        Assert.Contains("(parseNode) -> Error401.createFromDiscriminatorValueWithMessage(parseNode, \"Unauthorized\")", result);
         Assert.Contains("send", result.ToLower());
     }
 
@@ -2245,7 +2245,7 @@ public sealed class CodeMethodWriterTests : IDisposable
     {
         setup();
         parentClass.IsErrorDefinition = true;
-        method.Kind = CodeMethodKind.Factory;
+        method.Kind = CodeMethodKind.FactoryWithErrorMessage;
         method.Name = "createFromDiscriminatorValueWithMessage";
         method.IsStatic = true;
         method.AddParameter(new CodeParameter
@@ -2257,6 +2257,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         method.AddParameter(new CodeParameter
         {
             Name = "message",
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType { Name = "String", IsExternal = true }
         });
         writer.Write(method);
@@ -2284,6 +2285,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         constructor.AddParameter(new CodeParameter
         {
             Name = "message",
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType { Name = "String", IsExternal = true }
         });
 

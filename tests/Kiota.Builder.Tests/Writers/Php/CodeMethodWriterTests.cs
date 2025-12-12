@@ -2599,8 +2599,8 @@ public sealed class CodeMethodWriterTests : IDisposable
 
         // Check for enhanced error mapping with descriptions and PHP function syntax
         Assert.Contains("$errorMappings = [", result);
-        Assert.Contains("'4XX' => function($parseNode) { return Error4XX::createFromDiscriminatorValueWithMessage($parseNode, '4XX Client error response'); }", result);
-        Assert.Contains("'5XX' => function($parseNode) { return Error5XX::createFromDiscriminatorValueWithMessage($parseNode, '5XX Server error response'); }", result);
+        Assert.Contains("'4XX' => function($parseNode) { return Error4XX::createFromDiscriminatorValueWithMessage($parseNode, 'Client error response'); }", result);
+        Assert.Contains("'5XX' => function($parseNode) { return Error5XX::createFromDiscriminatorValueWithMessage($parseNode, 'Server error response'); }", result);
     }
 
     [Fact]
@@ -2656,7 +2656,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         var factoryMethod = errorClass.AddMethod(new CodeMethod
         {
             Name = "createFromDiscriminatorValueWithMessage",
-            Kind = CodeMethodKind.Factory,
+            Kind = CodeMethodKind.FactoryWithErrorMessage,
             ReturnType = new CodeType
             {
                 Name = "SomeError",
@@ -2683,7 +2683,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         factoryMethod.AddParameter(new CodeParameter
         {
             Name = "message",
-            Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType
             {
                 Name = "string",
