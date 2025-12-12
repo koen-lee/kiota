@@ -1031,53 +1031,13 @@ public class GoRefiner : CommonLanguageRefiner
                 codeClass.AddMethod(messageFactory);
             }
 
-            // Add message factory method with discriminator if not already present
-            const string MethodName = "CreateFromDiscriminatorValueWithMessage";
-            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
-            {
-                var messageFactoryMethod = new CodeMethod
-                {
-                    Name = MethodName,
-                    Kind = CodeMethodKind.FactoryWithErrorMessage,
-                    IsAsync = false,
-                    IsStatic = true,
-                    Documentation = new(new() {
-                        {"TypeName", new CodeType {
-                            IsExternal = false,
-                            TypeDefinition = codeClass,
-                        }}
-                    })
-                    {
-                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
-                    },
-                    Access = AccessModifier.Public,
-                    ReturnType = new CodeType
-                    {
-                        Name = "Parsable", // Go uses Parsable interface
-                        IsExternal = true,
-                        IsNullable = false,
-                    },
-                    Parent = codeClass,
-                };
-
-                // Add parseNode parameter
-                messageFactoryMethod.AddParameter(new CodeParameter
-                {
-                    Name = "parseNode",
-                    Kind = CodeParameterKind.ParseNode,
-                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
-                    }
-                });
-
-                // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("string"));
-
-                codeClass.AddMethod(messageFactoryMethod);
-            }
+            TryAddErrorMessageFactoryMethod(
+               codeClass,
+               methodName: "CreateFromDiscriminatorValueWithMessage",
+               parseNodeTypeName: "ParseNode",
+               messageParameterTypeName: "string",
+               returnTypeName: "Parsable",
+               returnTypeIsExternal: true);
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);
     }

@@ -1653,4 +1653,93 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
             }
         };
     }
+
+    /// <summary>
+    /// Creates a factory method for error classes that accepts both parseNode and message parameters,
+    /// and adds it to the class if it doesn't already exist.
+    /// This factory method is used to create error instances with custom error messages from discriminator values.
+    /// </summary>
+    /// <param name="codeClass">The error class to create the factory method for</param>
+    /// <param name="methodName">The name of the factory method (e.g., "createFromDiscriminatorValueWithMessage")</param>
+    /// <param name="parseNodeTypeName">The type name for the ParseNode parameter (e.g., "ParseNode", "IParseNode")</param>
+    /// <param name="messageParameterTypeName">The type name for the message parameter (e.g., "string", "String")</param>
+    /// <param name="returnTypeName">Optional custom return type name; if null, uses codeClass.Name</param>
+    /// <param name="returnTypeIsNullable">Whether the return type should be nullable</param>
+    /// <param name="messageParameterOptional">Whether the message parameter should be optional</param>
+    /// <param name="setParent">Whether to set the Parent property on the method</param>
+    /// <param name="returnTypeIsExternal">Whether the return type is external (e.g., for Go's "Parsable")</param>
+    /// <returns>True if the method was created and added; false if it already existed</returns>
+    protected static bool TryAddErrorMessageFactoryMethod(
+        CodeClass codeClass,
+        string methodName,
+        string parseNodeTypeName,
+        string messageParameterTypeName,
+        string? returnTypeName = null,
+        bool returnTypeIsNullable = false,
+        bool messageParameterOptional = false,
+        bool setParent = true,
+        bool returnTypeIsExternal = false,
+        string messageParameterDefaultValue = "",
+        string parseNodeParameterName = "parseNode")
+    {
+        ArgumentNullException.ThrowIfNull(codeClass);
+
+        // Check if method already exists
+        if (codeClass.Methods.Any(m => m.Name.Equals(methodName, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var method = new CodeMethod
+        {
+            Name = methodName,
+            Kind = CodeMethodKind.FactoryWithErrorMessage,
+            IsAsync = false,
+            IsStatic = true,
+            Documentation = new(new Dictionary<string, CodeTypeBase>
+            {
+                {
+                    "TypeName", new CodeType
+                    {
+                        IsExternal = false,
+                        TypeDefinition = codeClass,
+                    }
+                }
+            })
+            {
+                DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
+            },
+            Access = AccessModifier.Public,
+            ReturnType = new CodeType
+            {
+                Name = returnTypeName ?? codeClass.Name,
+                TypeDefinition = returnTypeIsExternal ? null : codeClass,
+                IsNullable = returnTypeIsNullable,
+                IsExternal = returnTypeIsExternal
+            }
+        };
+
+        if (setParent)
+        {
+            method.Parent = codeClass;
+        }
+
+        method.AddParameter(new CodeParameter
+        {
+            Name = parseNodeParameterName,
+            Kind = CodeParameterKind.ParseNode,
+            Type = new CodeType { Name = parseNodeTypeName, IsExternal = true },
+            Optional = false,
+            Documentation = new()
+            {
+                DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
+            }
+        });
+
+        // Add message parameter
+        method.AddParameter(CreateErrorMessageParameter(messageParameterTypeName, messageParameterOptional, messageParameterDefaultValue));
+
+        codeClass.AddMethod(method);
+        return true;
+    }
 }

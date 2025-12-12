@@ -190,52 +190,12 @@ public class DartRefiner : CommonLanguageRefiner, ILanguageRefiner
                 codeClass.AddMethod(messageConstructor);
             }
 
-            // Add message factory method if not already present
-            const string MethodName = "createFromDiscriminatorValueWithMessage";
-            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
-            {
-                var messageFactoryMethod = new CodeMethod
-                {
-                    Name = MethodName,
-                    Kind = CodeMethodKind.FactoryWithErrorMessage,
-                    IsAsync = false,
-                    IsStatic = true,
-                    Documentation = new(new() {
-                        {"TypeName", new CodeType {
-                            IsExternal = false,
-                            TypeDefinition = codeClass,
-                        }}
-                    })
-                    {
-                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
-                    },
-                    Access = AccessModifier.Public,
-                    ReturnType = new CodeType
-                    {
-                        Name = codeClass.Name,
-                        TypeDefinition = codeClass,
-                    },
-                    Parent = codeClass,
-                };
-
-                // Add parseNode parameter
-                messageFactoryMethod.AddParameter(new CodeParameter
-                {
-                    Name = "parseNode",
-                    Kind = CodeParameterKind.ParseNode,
-                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
-                    Optional = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
-                    }
-                });
-
-                // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String"));
-
-                codeClass.AddMethod(messageFactoryMethod);
-            }
+            TryAddErrorMessageFactoryMethod(
+               codeClass,
+               methodName: "createFromDiscriminatorValueWithMessage",
+               parseNodeTypeName: "ParseNode",
+               messageParameterTypeName: "String",
+               setParent: false);
         }
         CrawlTree(currentElement, element => AddConstructorForErrorClass(element));
     }

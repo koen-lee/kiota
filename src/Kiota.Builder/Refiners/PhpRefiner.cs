@@ -514,44 +514,13 @@ public class PhpRefiner : CommonLanguageRefiner
                 codeClass.AddMethod(messageConstructor);
             }
 
-            // Add CreateFromDiscriminatorValueWithMessage factory method if not exists
-            const string MethodName = "createFromDiscriminatorValueWithMessage";
-            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
-            {
-                var discriminatorMessageFactory = new CodeMethod
-                {
-                    Name = MethodName,
-                    Kind = CodeMethodKind.FactoryWithErrorMessage,
-                    Access = AccessModifier.Public,
-                    IsAsync = false,
-                    IsStatic = true,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with custom message."
-                    },
-                    ReturnType = new CodeType
-                    {
-                        Name = codeClass.Name,
-                        TypeDefinition = codeClass,
-                        IsNullable = true
-                    }
-                };
-
-                // Add parseNode parameter
-                discriminatorMessageFactory.AddParameter(new CodeParameter
-                {
-                    Name = "parseNode",
-                    Kind = CodeParameterKind.ParseNode,
-                    Type = new CodeType { Name = "ParseNode", IsExternal = true },
-                    Optional = false,
-                    Documentation = new() { DescriptionTemplate = "The parse node to use to read the discriminator value and create the object" }
-                });
-
-                // Add message parameter
-                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("string"));
-
-                codeClass.AddMethod(discriminatorMessageFactory);
-            }
+            TryAddErrorMessageFactoryMethod(
+               codeClass,
+               methodName: "createFromDiscriminatorValueWithMessage",
+               parseNodeTypeName: "ParseNode",
+               messageParameterTypeName: "string",
+               returnTypeIsNullable: true,
+               setParent: false);
         }
 
         CrawlTree(codeElement, AddConstructorsForErrorClasses);
