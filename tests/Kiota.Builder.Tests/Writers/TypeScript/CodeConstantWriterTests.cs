@@ -513,8 +513,8 @@ public sealed class CodeConstantWriterTests : IDisposable
 
         // Check for enhanced error mapping with descriptions and TypeScript arrow function syntax
         Assert.Contains("errorMappings: {", result);
-        Assert.Contains("_4XX: (parseNode: ParseNode) => createError4XXFromDiscriminatorValueWithMessage(parseNode, \"4XX Client error response\") as ParsableFactory<Parsable>", result);
-        Assert.Contains("_5XX: (parseNode: ParseNode) => createError5XXFromDiscriminatorValueWithMessage(parseNode, \"5XX Server error response\") as ParsableFactory<Parsable>", result);
+        Assert.Contains("_4XX: (parseNode: ParseNode) => createError4XXFromDiscriminatorValueWithMessage(parseNode, \"Client error response\") as ParsableFactory<Parsable>", result);
+        Assert.Contains("_5XX: (parseNode: ParseNode) => createError5XXFromDiscriminatorValueWithMessage(parseNode, \"Server error response\") as ParsableFactory<Parsable>", result);
         AssertExtensions.CurlyBracesAreClosed(result);
     }
 

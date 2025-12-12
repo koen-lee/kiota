@@ -328,7 +328,7 @@ public class PhpLanguageRefinerTests
         // Check for CreateFromDiscriminatorValueWithMessage factory method
         var discriminatorMessageFactory = errorClass.Methods.FirstOrDefault(m =>
             m.Name == "createFromDiscriminatorValueWithMessage" &&
-            m.IsOfKind(CodeMethodKind.Factory));
+            m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
         Assert.NotNull(discriminatorMessageFactory);
         Assert.Equal(2, discriminatorMessageFactory.Parameters.Count());
         var parseNodeParam = discriminatorMessageFactory.Parameters.FirstOrDefault(p => p.Name == "parseNode");
@@ -351,7 +351,7 @@ public class PhpLanguageRefinerTests
         await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.PHP }, root);
 
         // Should not have error-specific constructors or factory methods
-        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
     }
 
     [Fact]
@@ -377,7 +377,7 @@ public class PhpLanguageRefinerTests
         // Should have only one of each constructor/method
         Assert.Single(errorClass.Methods, m => m.Name == "__construct" && m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any());
         Assert.Single(errorClass.Methods, m => m.Name == "__construct" && m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Count() == 1);
-        Assert.Single(errorClass.Methods, m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.Single(errorClass.Methods, m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
     }
 
     [Fact]
@@ -401,7 +401,7 @@ public class PhpLanguageRefinerTests
         Assert.NotNull(messageConstructor);
         Assert.NotEmpty(messageConstructor.Documentation.DescriptionTemplate);
 
-        var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "createFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
         Assert.NotNull(discriminatorMessageFactory);
         Assert.NotEmpty(discriminatorMessageFactory.Documentation.DescriptionTemplate);
     }

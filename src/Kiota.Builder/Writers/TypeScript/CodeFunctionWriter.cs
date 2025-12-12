@@ -118,6 +118,7 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
                 WriteSerializerFunction(codeElement, writer);
                 break;
             case CodeMethodKind.Factory:
+            case CodeMethodKind.FactoryWithErrorMessage:
                 WriteFactoryMethod(codeElement, codeFile, writer);
                 break;
             case CodeMethodKind.ClientConstructor:
@@ -337,8 +338,15 @@ public class CodeFunctionWriter(TypeScriptConventionService conventionService) :
         // Special case: FactoryWithErrorMessage for error classes
         if (codeElement.OriginalLocalMethod.IsOfKind(CodeMethodKind.FactoryWithErrorMessage))
         {
-            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) ?? throw new InvalidOperationException($"FactoryWithErrorMessage should have a message parameter");
-            writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
+            var messageParam = codeElement.OriginalLocalMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage));
+            if (messageParam != null)
+            {
+                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}({messageParam.Name});");
+            }
+            else
+            {
+                writer.WriteLine($"return new {codeElement.OriginalMethodParentClass.Name.ToFirstCharacterUpperCase()}();");
+            }
             return;
         }
 

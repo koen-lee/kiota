@@ -721,7 +721,7 @@ public class PythonLanguageRefinerTests
 
         // Then
         var messageFactoryMethod = errorClass.Methods
-            .FirstOrDefault(m => m.IsOfKind(CodeMethodKind.Factory) &&
+            .FirstOrDefault(m => m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage) &&
                                 m.Name.Equals("create_from_discriminator_value_with_message", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(messageFactoryMethod);

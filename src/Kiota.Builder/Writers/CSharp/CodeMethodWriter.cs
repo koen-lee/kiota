@@ -93,6 +93,7 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, CSharpConventionSe
                 WriteCommandBuilderBody(codeElement, parentClass, requestParams, isVoid, returnType, writer);
                 break;
             case CodeMethodKind.Factory:
+            case CodeMethodKind.FactoryWithErrorMessage:
                 WriteFactoryMethodBody(codeElement, parentClass, writer);
                 break;
             case CodeMethodKind.ComposedTypeMarker:
