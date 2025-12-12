@@ -554,21 +554,6 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
         CrawlTree(currentElement, x => AddQueryParameterExtractorMethod(x, methodName));
     }
 
-    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
-    {
-        return new CodeParameter
-        {
-            Name = "message",
-            Type = new CodeType { Name = "String", IsExternal = true },
-            Kind = CodeParameterKind.ErrorMessage,
-            Optional = false,
-            Documentation = new()
-            {
-                DescriptionTemplate = descriptionTemplate
-            }
-        };
-    }
-
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
@@ -584,7 +569,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                messageConstructor.AddParameter(CreateErrorMessageParameter("String"));
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -630,7 +615,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String", descriptionTemplate: "The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

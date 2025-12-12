@@ -338,22 +338,6 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
             .ForEach(static x => x.Name = "MicrosoftKiotaAbstractions::AdditionalDataHolder");
     }
 
-    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
-    {
-        return new CodeParameter
-        {
-            Name = "message",
-            Type = new CodeType { Name = "String", IsExternal = true },
-            Kind = CodeParameterKind.ErrorMessage,
-            Optional = true,
-            DefaultValue = "nil",
-            Documentation = new()
-            {
-                DescriptionTemplate = descriptionTemplate
-            }
-        };
-    }
-
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
@@ -373,7 +357,7 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                messageConstructor.AddParameter(CreateErrorMessageParameter("String", optional: true, defaultValue: "nil"));
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -419,7 +403,7 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String", optional: true, defaultValue: "nil", descriptionTemplate: "The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

@@ -271,21 +271,6 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
         CrawlTree(currentElement, SetTypeAccessModifiers);
     }
 
-    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
-    {
-        return new CodeParameter
-        {
-            Name = "message",
-            Type = new CodeType { Name = "string", IsExternal = true },
-            Kind = CodeParameterKind.ErrorMessage,
-            Optional = false,
-            Documentation = new()
-            {
-                DescriptionTemplate = descriptionTemplate
-            }
-        };
-    }
-
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
@@ -301,7 +286,7 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                messageConstructor.AddParameter(CreateErrorMessageParameter("string"));
                 codeClass.AddMethod(messageConstructor);
             }
         }
@@ -353,7 +338,7 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
             });
 
             // Add message parameter
-            method.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+            method.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
         }
         CrawlTree(currentElement, AddMessageFactoryMethodForErrorClasses);
     }

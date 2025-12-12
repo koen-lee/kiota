@@ -392,22 +392,6 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                     })},
     };
 
-    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
-    {
-        return new CodeParameter
-        {
-            Name = "message",
-            Type = new CodeType { Name = "str", IsExternal = true },
-            Kind = CodeParameterKind.ErrorMessage,
-            Optional = true, // Python allows optional parameters with default None
-            DefaultValue = "None",
-            Documentation = new()
-            {
-                DescriptionTemplate = descriptionTemplate
-            }
-        };
-    }
-
     private static void AddConstructorsForErrorClasses(CodeElement currentElement)
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
@@ -423,7 +407,7 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                messageConstructor.AddParameter(CreateErrorMessageParameter("str", optional: true, defaultValue: "None"));
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -469,7 +453,7 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("str", optional: true, defaultValue: "None", descriptionTemplate: "The error message to set on the created object"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

@@ -473,21 +473,6 @@ public class PhpRefiner : CommonLanguageRefiner
         CrawlTree(codeElement, AddQueryParameterFactoryMethod);
     }
 
-    private static CodeParameter CreateErrorMessageParameter(string descriptionTemplate = "The error message")
-    {
-        return new CodeParameter
-        {
-            Name = "message",
-            Type = new CodeType { Name = "string", IsExternal = true },
-            Kind = CodeParameterKind.ErrorMessage,
-            Optional = false,
-            Documentation = new()
-            {
-                DescriptionTemplate = descriptionTemplate
-            }
-        };
-    }
-
     private static void AddConstructorsForErrorClasses(CodeElement codeElement)
     {
         if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
@@ -525,7 +510,7 @@ public class PhpRefiner : CommonLanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-                messageConstructor.AddParameter(CreateErrorMessageParameter());
+                messageConstructor.AddParameter(CreateErrorMessageParameter("string"));
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -563,7 +548,7 @@ public class PhpRefiner : CommonLanguageRefiner
                 });
 
                 // Add message parameter
-                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("The error message to set on the created object"));
+                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
 
                 codeClass.AddMethod(discriminatorMessageFactory);
             }

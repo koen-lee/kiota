@@ -1626,4 +1626,35 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
         }
         CrawlTree(codeElement, DeduplicateErrorMappings);
     }
+    /// <summary>
+    /// Creates a CodeParameter for error messages with language-specific configuration.
+    /// </summary>
+    /// <param name="typeName">The type name for the message parameter (e.g., "string", "String", "str")</param>
+    /// <param name="optional">Whether the parameter is optional</param>
+    /// <param name="defaultValue">The default value if optional (e.g., "None", "nil")</param>
+    /// <param name="descriptionTemplate">The documentation description template</param>
+    /// <returns>A configured CodeParameter for error messages</returns>
+    protected static CodeParameter CreateErrorMessageParameter(
+        string typeName,
+        bool optional = false,
+        string? defaultValue = null,
+        string descriptionTemplate = "The error message")
+    {
+        var parameter = new CodeParameter
+        {
+            Name = "message",
+            Type = new CodeType { Name = typeName, IsExternal = true },
+            Kind = CodeParameterKind.ErrorMessage,
+            Optional = optional,
+            Documentation = new()
+            {
+                DescriptionTemplate = descriptionTemplate
+            }
+        };
+        if (defaultValue is not null)
+        {
+            parameter.DefaultValue = defaultValue;
+        }
+        return parameter;
+    }
 }
