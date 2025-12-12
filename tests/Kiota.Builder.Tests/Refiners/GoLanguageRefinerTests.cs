@@ -1360,7 +1360,7 @@ components:
         // Check that the factory methods were created for error classes
         var parameterlessFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeError" && m.IsOfKind(CodeMethodKind.Factory));
         var messageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
-        var discriminatorMessageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        var discriminatorMessageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
 
         Assert.NotNull(parameterlessFactory);
         Assert.NotNull(messageFactory);
@@ -1388,7 +1388,7 @@ components:
         // Should not have error-specific factory methods
         Assert.DoesNotContain(regularClass.Methods, m => m.Name == "NewSomeModel" && m.IsOfKind(CodeMethodKind.Factory));
         Assert.DoesNotContain(regularClass.Methods, m => m.Name == "NewSomeModelWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
-        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.DoesNotContain(regularClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
     }
 
     [Fact]
@@ -1415,7 +1415,7 @@ components:
         // Should have only one of each factory method
         Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateError" && m.IsOfKind(CodeMethodKind.Factory));
         Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
-        Assert.Single(errorClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.Single(errorClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
     }
 
     [Fact]
@@ -1440,9 +1440,54 @@ components:
         Assert.NotNull(messageFactory);
         Assert.NotEmpty(messageFactory.Documentation.DescriptionTemplate);
 
-        var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
         Assert.NotNull(discriminatorMessageFactory);
         Assert.NotEmpty(discriminatorMessageFactory.Documentation.DescriptionTemplate);
+    }
+
+    [Fact]
+    public async Task EscapesReservedKeywordsInMethodParametersAsync()
+    {
+        var model = root.AddClass(new CodeClass
+        {
+            Name = "RequestBuilder",
+            Kind = CodeClassKind.RequestBuilder
+        }).First();
+        var method = model.AddMethod(new CodeMethod
+        {
+            Name = "Execute",
+            Kind = CodeMethodKind.RequestExecutor,
+            ReturnType = new CodeType
+            {
+                Name = "string"
+            }
+        }).First();
+        // Add a parameter with a reserved keyword name
+        method.AddParameter(new CodeParameter
+        {
+            Name = "type",
+            Kind = CodeParameterKind.Custom,
+            Type = new CodeType
+            {
+                Name = "string"
+            }
+        });
+        method.AddParameter(new CodeParameter
+        {
+            Name = "select",
+            Kind = CodeParameterKind.Custom,
+            Type = new CodeType
+            {
+                Name = "string"
+            }
+        });
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
+
+        // Verify that reserved keyword parameters are escaped
+        Assert.Contains(method.Parameters, p => p.Name == "typeEscaped");
+        Assert.Contains(method.Parameters, p => p.Name == "selectEscaped");
+        Assert.DoesNotContain(method.Parameters, p => p.Name == "type");
+        Assert.DoesNotContain(method.Parameters, p => p.Name == "select");
     }
     #endregion
 }

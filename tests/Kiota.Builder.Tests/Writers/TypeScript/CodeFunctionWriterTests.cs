@@ -29,7 +29,6 @@ public sealed class CodeFunctionWriterTests : IDisposable
     private const string ReturnTypeName = "Somecustomtype";
     private readonly HttpClient _httpClient = new();
     private readonly List<string> _tempFiles = new();
-    private const string IndexFileName = "index";
 
     public CodeFunctionWriterTests()
     {
@@ -1677,6 +1676,7 @@ public sealed class CodeFunctionWriterTests : IDisposable
 
         Assert.Contains("\"property\": n => { parentClass.property = n.getCollectionOfObjectValues<ArrayOfObjects>(createArrayOfObjectsFromDiscriminatorValue) ?? n.getNumberValue() ?? n.getObjectValue<SingleObject>(createSingleObjectFromDiscriminatorValue) ?? n.getStringValue(); }", result);
     }
+
     [Fact]
     public void WritesByteArrayPropertyDeserialization()
     {
@@ -1733,7 +1733,7 @@ public sealed class CodeFunctionWriterTests : IDisposable
         var factoryMethod = errorClass.AddMethod(new CodeMethod
         {
             Name = "createFromDiscriminatorValueWithMessage",
-            Kind = CodeMethodKind.Factory,
+            Kind = CodeMethodKind.FactoryWithErrorMessage,
             ReturnType = new CodeType
             {
                 Name = "SomeError",
@@ -1760,7 +1760,7 @@ public sealed class CodeFunctionWriterTests : IDisposable
         factoryMethod.AddParameter(new CodeParameter
         {
             Name = "message",
-            Kind = CodeParameterKind.RequestBodyContentType, // Using this as generic string parameter
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType
             {
                 Name = "string",
@@ -1794,7 +1794,7 @@ public sealed class CodeFunctionWriterTests : IDisposable
         var factoryMethod = errorClass.AddMethod(new CodeMethod
         {
             Name = "createFromDiscriminatorValueWithMessage",
-            Kind = CodeMethodKind.Factory,
+            Kind = CodeMethodKind.FactoryWithErrorMessage,
             ReturnType = new CodeType
             {
                 Name = "SomeError",
@@ -1868,7 +1868,7 @@ public sealed class CodeFunctionWriterTests : IDisposable
         factoryMethod.AddParameter(new CodeParameter
         {
             Name = "message",
-            Kind = CodeParameterKind.RequestBodyContentType,
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType
             {
                 Name = "string",
@@ -1886,6 +1886,70 @@ public sealed class CodeFunctionWriterTests : IDisposable
         Assert.DoesNotContain("new SomeModel(message)", result);
         // Should continue with normal factory method logic - the exact output varies based on setup but should not be the error handling path
         AssertExtensions.CurlyBracesAreClosed(result, 1);
+    }
+
+    [Fact]
+    public async Task WritesOneOfWithInheritanceDeserializationAsync()
+    {
+        // Create base class "Device"
+        var baseClass = TestHelper.CreateModelClass(root, "Device");
+        baseClass.AddProperty(new CodeProperty
+        {
+            Name = "deviceId",
+            Type = new CodeType { Name = "string" },
+            Kind = CodePropertyKind.Custom,
+        });
+
+        // Create derived class "ManagedPrivilegedDevice" that inherits from "Device"
+        var derivedClass = TestHelper.CreateModelClass(root, "ManagedPrivilegedDevice");
+        derivedClass.StartBlock.Inherits = new CodeType
+        {
+            Name = "Device",
+            TypeDefinition = baseClass,
+        };
+        derivedClass.AddProperty(new CodeProperty
+        {
+            Name = "privilegeLevel",
+            Type = new CodeType { Name = "string" },
+            Kind = CodePropertyKind.Custom,
+        });
+
+        // Create a model with a oneOf property containing both types
+        var parentClass = TestHelper.CreateModelClass(root, "Container");
+        var composedType = new CodeUnionType { Name = "DeviceUnion" };
+
+        // Add types in alphabetical order: Device comes before ManagedPrivilegedDevice
+        // But ManagedPrivilegedDevice should be checked first because it's derived from Device
+        composedType.AddType(
+            new CodeType { Name = "Device", TypeDefinition = baseClass },
+            new CodeType { Name = "ManagedPrivilegedDevice", TypeDefinition = derivedClass }
+        );
+
+        parentClass.AddProperty(new CodeProperty
+        {
+            Name = "deviceProperty",
+            Type = composedType,
+            Kind = CodePropertyKind.Custom,
+        });
+
+        await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.TypeScript }, root);
+        var deserializerFunction = root.FindChildByName<CodeFunction>($"deserializeIntoContainer");
+        Assert.NotNull(deserializerFunction);
+        var parentNS = deserializerFunction.GetImmediateParentOfType<CodeNamespace>();
+        Assert.NotNull(parentNS);
+        parentNS.TryAddCodeFile("foo", deserializerFunction);
+        writer.Write(deserializerFunction);
+        var result = tw.ToString();
+
+        // The generated code should check ManagedPrivilegedDevice first (derived class)
+        // before checking Device (base class), regardless of alphabetical order
+        // This ensures proper deserialization when the derived type is received
+        var managedDeviceIndex = result.IndexOf("createManagedPrivilegedDeviceFromDiscriminatorValue", StringComparison.Ordinal);
+        var deviceIndex = result.IndexOf("createDeviceFromDiscriminatorValue", StringComparison.Ordinal);
+
+        Assert.True(managedDeviceIndex > 0, "Should contain ManagedPrivilegedDevice deserialization");
+        Assert.True(deviceIndex > 0, "Should contain Device deserialization");
+        Assert.True(managedDeviceIndex < deviceIndex, "ManagedPrivilegedDevice should appear before Device in the deserialization chain");
     }
 }
 
