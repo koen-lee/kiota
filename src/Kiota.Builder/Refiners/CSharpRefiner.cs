@@ -108,7 +108,6 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
             );
             AddConstructorsForDefaultValues(generatedCode, false);
             AddConstructorsForErrorClasses(generatedCode);
-            AddMessageFactoryMethodForErrorClasses(generatedCode);
             AddDiscriminatorMappingsUsingsToParentClasses(
                 generatedCode,
                 "IParseNode"
@@ -289,57 +288,52 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
                 messageConstructor.AddParameter(CreateErrorMessageParameter("string"));
                 codeClass.AddMethod(messageConstructor);
             }
+
+            // Add message factory method if not already present
+            const string MethodName = "CreateFromDiscriminatorValueWithMessage";
+            if (!codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
+            {
+                var method = codeClass.AddMethod(new CodeMethod
+                {
+                    Name = MethodName,
+                    Kind = CodeMethodKind.FactoryWithErrorMessage,
+                    IsAsync = false,
+                    IsStatic = true,
+                    Documentation = new(new() {
+                        {"TypeName", new CodeType {
+                            IsExternal = false,
+                            TypeDefinition = codeClass,
+                        }}
+                    })
+                    {
+                        DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
+                    },
+                    Access = AccessModifier.Public,
+                    ReturnType = new CodeType
+                    {
+                        Name = codeClass.Name,
+                        TypeDefinition = codeClass,
+                    },
+                    Parent = codeClass,
+                }).Single();
+
+                // Add parseNode parameter
+                method.AddParameter(new CodeParameter
+                {
+                    Name = "parseNode",
+                    Type = new CodeType { Name = "IParseNode", IsExternal = true },
+                    Kind = CodeParameterKind.ParseNode,
+                    Optional = false,
+                    Documentation = new()
+                    {
+                        DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
+                    }
+                });
+
+                // Add message parameter
+                method.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
+            }
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);
-    }
-
-    private static void AddMessageFactoryMethodForErrorClasses(CodeElement currentElement)
-    {
-        const string MethodName = "CreateFromDiscriminatorValueWithMessage";
-        if (currentElement is CodeClass codeClass &&
-            codeClass.IsErrorDefinition &&
-            !codeClass.Methods.Any(m => m.Name.Equals(MethodName, StringComparison.Ordinal)))
-        {
-            var method = codeClass.AddMethod(new CodeMethod
-            {
-                Name = MethodName,
-                Kind = CodeMethodKind.FactoryWithErrorMessage,
-                IsAsync = false,
-                IsStatic = true,
-                Documentation = new(new() {
-                    {"TypeName", new CodeType {
-                        IsExternal = false,
-                        TypeDefinition = codeClass,
-                    }}
-                })
-                {
-                    DescriptionTemplate = "Creates a new instance of the appropriate class based on discriminator value with a custom error message.",
-                },
-                Access = AccessModifier.Public,
-                ReturnType = new CodeType
-                {
-                    Name = codeClass.Name,
-                    TypeDefinition = codeClass,
-                },
-                Parent = codeClass,
-            }).Single();
-
-            // Add parseNode parameter
-            method.AddParameter(new CodeParameter
-            {
-                Name = "parseNode",
-                Type = new CodeType { Name = "IParseNode", IsExternal = true },
-                Kind = CodeParameterKind.ParseNode,
-                Optional = false,
-                Documentation = new()
-                {
-                    DescriptionTemplate = "The parse node to use to read the discriminator value and create the object"
-                }
-            });
-
-            // Add message parameter
-            method.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
-        }
-        CrawlTree(currentElement, AddMessageFactoryMethodForErrorClasses);
     }
 }
