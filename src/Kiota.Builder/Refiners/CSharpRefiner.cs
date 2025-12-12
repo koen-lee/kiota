@@ -331,7 +331,7 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                method.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
+                method.AddParameter(CreateErrorMessageParameter("string"));
             }
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);

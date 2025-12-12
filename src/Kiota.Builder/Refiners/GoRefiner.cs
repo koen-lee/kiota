@@ -1074,7 +1074,7 @@ public class GoRefiner : CommonLanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("string", descriptionTemplate: "The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("string"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

@@ -1626,6 +1626,7 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
         }
         CrawlTree(codeElement, DeduplicateErrorMappings);
     }
+
     /// <summary>
     /// Creates a CodeParameter for error messages with language-specific configuration.
     /// </summary>
@@ -1637,24 +1638,19 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
     protected static CodeParameter CreateErrorMessageParameter(
         string typeName,
         bool optional = false,
-        string? defaultValue = null,
-        string descriptionTemplate = "The error message")
+        string defaultValue = "")
     {
-        var parameter = new CodeParameter
+        return new CodeParameter
         {
             Name = "message",
             Type = new CodeType { Name = typeName, IsExternal = true },
             Kind = CodeParameterKind.ErrorMessage,
             Optional = optional,
+            DefaultValue = defaultValue,
             Documentation = new()
             {
-                DescriptionTemplate = descriptionTemplate
+                DescriptionTemplate = "The error message to set"
             }
         };
-        if (defaultValue is not null)
-        {
-            parameter.DefaultValue = defaultValue;
-        }
-        return parameter;
     }
 }

@@ -403,7 +403,7 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String", optional: true, defaultValue: "nil", descriptionTemplate: "The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String", optional: true, defaultValue: "nil"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

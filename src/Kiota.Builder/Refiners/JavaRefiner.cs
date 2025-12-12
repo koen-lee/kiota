@@ -615,7 +615,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String", descriptionTemplate: "The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("String"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }

@@ -1639,7 +1639,7 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("string", optional: true, descriptionTemplate: "The error message to set on the created object"));
+                discriminatorMessageFactory.AddParameter(CreateErrorMessageParameter("string", optional: true));
 
                 codeClass.AddMethod(discriminatorMessageFactory);
             }

@@ -453,7 +453,7 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
                 });
 
                 // Add message parameter
-                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("str", optional: true, defaultValue: "None", descriptionTemplate: "The error message to set on the created object"));
+                messageFactoryMethod.AddParameter(CreateErrorMessageParameter("str", optional: true, defaultValue: "None"));
 
                 codeClass.AddMethod(messageFactoryMethod);
             }
