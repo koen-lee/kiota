@@ -543,7 +543,7 @@ public class DartLanguageRefinerTests
 
         // Then
         var messageFactoryMethod = errorClass.Methods
-            .FirstOrDefault(m => m.IsOfKind(CodeMethodKind.Factory) &&
+            .FirstOrDefault(m => m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage) &&
                                 m.Name.Equals("createFromDiscriminatorValueWithMessage", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(messageFactoryMethod);

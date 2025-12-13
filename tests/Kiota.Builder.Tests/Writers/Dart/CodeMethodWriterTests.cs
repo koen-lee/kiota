@@ -1672,7 +1672,7 @@ public sealed class CodeMethodWriterTests : IDisposable
     {
         setup();
         parentClass.IsErrorDefinition = true;
-        method.Kind = CodeMethodKind.Factory;
+        method.Kind = CodeMethodKind.FactoryWithErrorMessage;
         method.Name = "createFromDiscriminatorValueWithMessage";
         method.IsStatic = true;
         method.AddParameter(new CodeParameter
@@ -1684,6 +1684,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         method.AddParameter(new CodeParameter
         {
             Name = "message",
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType { Name = "String", IsExternal = true }
         });
         writer.Write(method);
@@ -1702,7 +1703,7 @@ public sealed class CodeMethodWriterTests : IDisposable
             Kind = CodePropertyKind.AdditionalData,
             Type = new CodeType { Name = "Map<String, Object>", IsExternal = true }
         });
-        method.Kind = CodeMethodKind.Factory;
+        method.Kind = CodeMethodKind.FactoryWithErrorMessage;
         method.Name = "createFromDiscriminatorValueWithMessage";
         method.IsStatic = true;
         method.AddParameter(new CodeParameter
@@ -1714,6 +1715,7 @@ public sealed class CodeMethodWriterTests : IDisposable
         method.AddParameter(new CodeParameter
         {
             Name = "message",
+            Kind = CodeParameterKind.ErrorMessage,
             Type = new CodeType { Name = "String", IsExternal = true }
         });
         writer.Write(method);

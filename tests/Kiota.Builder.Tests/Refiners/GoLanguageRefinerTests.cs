@@ -1358,17 +1358,17 @@ components:
         await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
 
         // Check that the factory methods were created for error classes
-        var parameterlessFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeError" && m.IsOfKind(CodeMethodKind.Factory));
-        var messageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        var parameterlessConstructor = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeError" && m.IsOfKind(CodeMethodKind.Constructor));
+        var messageConstructor = errorClass.Methods.FirstOrDefault(m => m.Name == "NewSomeErrorWithMessage" && m.IsOfKind(CodeMethodKind.Constructor));
         var discriminatorMessageFactory = errorClass.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
 
-        Assert.NotNull(parameterlessFactory);
-        Assert.NotNull(messageFactory);
+        Assert.NotNull(parameterlessConstructor);
+        Assert.NotNull(messageConstructor);
         Assert.NotNull(discriminatorMessageFactory);
 
         // Check parameter counts
-        Assert.Empty(parameterlessFactory.Parameters);
-        Assert.Single(messageFactory.Parameters);
+        Assert.Empty(parameterlessConstructor.Parameters);
+        Assert.Single(messageConstructor.Parameters);
         Assert.Equal(2, discriminatorMessageFactory.Parameters.Count());
     }
 
@@ -1413,8 +1413,8 @@ components:
         await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
 
         // Should have only one of each factory method
-        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateError" && m.IsOfKind(CodeMethodKind.Factory));
-        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
+        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateError" && m.IsOfKind(CodeMethodKind.Constructor));
+        Assert.Single(errorClass.Methods, m => m.Name == "NewDuplicateErrorWithMessage" && m.IsOfKind(CodeMethodKind.Constructor));
         Assert.Single(errorClass.Methods, m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
     }
 
@@ -1432,13 +1432,13 @@ components:
         await ILanguageRefiner.RefineAsync(new GenerationConfiguration { Language = GenerationLanguage.Go }, root);
 
         // Check factory methods are created
-        var parameterlessFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedError" && m.IsOfKind(CodeMethodKind.Factory));
-        Assert.NotNull(parameterlessFactory);
-        Assert.NotEmpty(parameterlessFactory.Documentation.DescriptionTemplate);
+        var parameterlessConstructor = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedError" && m.IsOfKind(CodeMethodKind.Constructor));
+        Assert.NotNull(parameterlessConstructor);
+        Assert.NotEmpty(parameterlessConstructor.Documentation.DescriptionTemplate);
 
-        var messageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedErrorWithMessage" && m.IsOfKind(CodeMethodKind.Factory));
-        Assert.NotNull(messageFactory);
-        Assert.NotEmpty(messageFactory.Documentation.DescriptionTemplate);
+        var messageConstructor = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "NewDetailedErrorWithMessage" && m.IsOfKind(CodeMethodKind.Constructor));
+        Assert.NotNull(messageConstructor);
+        Assert.NotEmpty(messageConstructor.Documentation.DescriptionTemplate);
 
         var discriminatorMessageFactory = errorClassWithDescription.Methods.FirstOrDefault(m => m.Name == "CreateFromDiscriminatorValueWithMessage" && m.IsOfKind(CodeMethodKind.FactoryWithErrorMessage));
         Assert.NotNull(discriminatorMessageFactory);
