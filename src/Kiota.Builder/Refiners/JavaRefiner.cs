@@ -564,12 +564,12 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
                 var parameterlessConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} and sets the default values.");
                 codeClass.AddMethod(parameterlessConstructor);
             }
-
+            var messageParameter = CreateErrorMessageParameter("String");
             // Add message constructor if not already present
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter("String"));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -577,7 +577,7 @@ public class JavaRefiner : CommonLanguageRefiner, ILanguageRefiner
              codeClass,
              methodName: "createFromDiscriminatorValueWithMessage",
              parseNodeTypeName: "ParseNode",
-             messageParameterTypeName: "String");
+             messageParameter: messageParameter);
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);
     }

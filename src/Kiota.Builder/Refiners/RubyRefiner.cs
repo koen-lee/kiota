@@ -342,6 +342,7 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
     {
         if (currentElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
+            var messageParameter = CreateErrorMessageParameter("String", optional: true, defaultValue: "nil");
             // Add initialize method (Ruby's constructor) with message parameter if not exists
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
@@ -357,16 +358,14 @@ public partial class RubyRefiner : CommonLanguageRefiner, ILanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-                messageConstructor.AddParameter(CreateErrorMessageParameter("String", optional: true, defaultValue: "nil"));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
-            TryAddErrorMessageFactoryMethod(
-                codeClass, "create_from_discriminator_value_with_message",
+            TryAddErrorMessageFactoryMethod(codeClass,
+                "create_from_discriminator_value_with_message",
                 "parse_node",
-                "String",
-                messageParameterOptional: true,
-                messageParameterDefaultValue: "nil"
+                messageParameter: messageParameter
             );
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);

@@ -1673,13 +1673,11 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
         CodeClass codeClass,
         string methodName,
         string parseNodeTypeName,
-        string messageParameterTypeName,
+        CodeParameter messageParameter,
         string? returnTypeName = null,
         bool returnTypeIsNullable = false,
-        bool messageParameterOptional = false,
         bool setParent = true,
         bool returnTypeIsExternal = false,
-        string messageParameterDefaultValue = "",
         string parseNodeParameterName = "parseNode")
     {
         ArgumentNullException.ThrowIfNull(codeClass);
@@ -1737,7 +1735,7 @@ public abstract class CommonLanguageRefiner : ILanguageRefiner
         });
 
         // Add message parameter
-        method.AddParameter(CreateErrorMessageParameter(messageParameterTypeName, messageParameterOptional, messageParameterDefaultValue));
+        method.AddParameter(messageParameter);
 
         codeClass.AddMethod(method);
         return true;

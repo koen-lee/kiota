@@ -570,6 +570,15 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             writer.DecreaseIndent();
         }
         writer.CloseBlock(decreaseIndent: false);
+
+        // Handle error message parameter for error classes
+        if (parentClass.IsErrorDefinition && currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) is CodeParameter messageParam)
+        {
+            if (parentClass.GetPrimaryMessageCodePath(static x => x.Name.ToFirstCharacterUpperCase(), static x => "Set" + x.Name.ToFirstCharacterUpperCase()) is string primaryMessageSetter && !string.IsNullOrEmpty(primaryMessageSetter))
+            {
+                writer.WriteLine($"m.{primaryMessageSetter}(&{messageParam.Name.ToFirstCharacterLowerCase()})");
+            }
+        }
         foreach (var propWithDefault in parentClass.GetPropertiesOfKind(CodePropertyKind.BackingStore,
                                                                         CodePropertyKind.RequestBuilder)
                                         .Where(static x => !string.IsNullOrEmpty(x.DefaultValue))

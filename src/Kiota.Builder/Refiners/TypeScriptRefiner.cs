@@ -1585,7 +1585,7 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                 };
                 codeClass.AddMethod(parameterlessConstructor);
             }
-
+            var messageParameter = CreateErrorMessageParameter("string", optional: true);
             // Add constructor with message parameter if not exists
             if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
@@ -1601,7 +1601,7 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-                messageConstructor.AddParameter(CreateErrorMessageParameter("string", optional: true));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -1609,9 +1609,8 @@ public class TypeScriptRefiner : CommonLanguageRefiner, ILanguageRefiner
                codeClass,
                methodName: "createFromDiscriminatorValueWithMessage",
                parseNodeTypeName: "ParseNode",
-               messageParameterTypeName: "string",
+               messageParameter: messageParameter,
                returnTypeIsNullable: true,
-               messageParameterOptional: true,
                setParent: false);
         }
 

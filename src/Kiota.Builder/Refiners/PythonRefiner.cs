@@ -404,19 +404,18 @@ public class PythonRefiner : CommonLanguageRefiner, ILanguageRefiner
             }
 
             // Add message constructor if not already present
+            var messageParameter = CreateErrorMessageParameter("str", optional: true, defaultValue: "None");
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter("str", optional: true, defaultValue: "None"));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
             TryAddErrorMessageFactoryMethod(codeClass,
                 "create_from_discriminator_value_with_message",
                 "ParseNode",
-                "str",
-                messageParameterOptional: true,
-                messageParameterDefaultValue: "None",
+                messageParameter,
                 parseNodeParameterName: "parse_node"
             );
         }

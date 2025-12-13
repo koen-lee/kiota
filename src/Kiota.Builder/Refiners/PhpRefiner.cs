@@ -495,6 +495,7 @@ public class PhpRefiner : CommonLanguageRefiner
                 codeClass.AddMethod(parameterlessConstructor);
             }
 
+            var messageParameter = CreateErrorMessageParameter("string");
             // Add constructor with message parameter if not exists
             if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
@@ -510,7 +511,7 @@ public class PhpRefiner : CommonLanguageRefiner
                     },
                     ReturnType = new CodeType { Name = "void", IsExternal = true }
                 };
-                messageConstructor.AddParameter(CreateErrorMessageParameter("string"));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
@@ -518,7 +519,7 @@ public class PhpRefiner : CommonLanguageRefiner
                codeClass,
                methodName: "createFromDiscriminatorValueWithMessage",
                parseNodeTypeName: "ParseNode",
-               messageParameterTypeName: "string",
+               messageParameter: messageParameter,
                returnTypeIsNullable: true,
                setParent: false);
         }

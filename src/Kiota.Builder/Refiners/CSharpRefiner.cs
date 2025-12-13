@@ -281,19 +281,20 @@ public class CSharpRefiner : CommonLanguageRefiner, ILanguageRefiner
                 codeClass.AddMethod(parameterlessConstructor);
             }
 
+            var messageParameter = CreateErrorMessageParameter("string");
             // Add message constructor if not already present
             if (!codeClass.Methods.Any(static x => x.IsOfKind(CodeMethodKind.Constructor) && x.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
             {
                 var messageConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} with the specified error message.");
-                messageConstructor.AddParameter(CreateErrorMessageParameter("string"));
+                messageConstructor.AddParameter(messageParameter);
                 codeClass.AddMethod(messageConstructor);
             }
 
             var method = TryAddErrorMessageFactoryMethod(
                     codeClass,
                     methodName: "CreateFromDiscriminatorValueWithMessage",
-                    parseNodeTypeName: "IParseNode",
-                    messageParameterTypeName: "string");
+                    messageParameter: messageParameter,
+                    parseNodeTypeName: "IParseNode");
         }
         CrawlTree(currentElement, AddConstructorsForErrorClasses);
     }
