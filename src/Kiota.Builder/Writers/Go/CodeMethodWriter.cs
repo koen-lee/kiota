@@ -454,7 +454,10 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         var isConstructor = code.IsOfKind(CodeMethodKind.Constructor, CodeMethodKind.ClientConstructor, CodeMethodKind.RawUrlConstructor);
         var methodName = code.Kind switch
         {
-            CodeMethodKind.Constructor when parentBlock is CodeClass parentClass && parentClass.IsOfKind(CodeClassKind.RequestBuilder) => $"New{parentClass.Name.ToFirstCharacterUpperCase()}Internal", // internal instantiation with url template parameters
+            CodeMethodKind.Constructor when code.Parameters.Any(p => p.IsOfKind(CodeParameterKind.ErrorMessage))
+                => code.Name.ToFirstCharacterLowerCase(),
+            CodeMethodKind.Constructor when parentBlock is CodeClass parentClass && parentClass.IsOfKind(CodeClassKind.RequestBuilder)
+                => $"New{parentClass.Name.ToFirstCharacterUpperCase()}Internal", // internal instantiation with url template parameters
             CodeMethodKind.Factory => $"Create{parentBlock.Name.ToFirstCharacterUpperCase()}FromDiscriminatorValue",
             _ when isConstructor => $"New{parentBlock.Name.ToFirstCharacterUpperCase()}",
             _ when code.Access == AccessModifier.Public => code.Name.ToFirstCharacterUpperCase(),
@@ -496,27 +499,27 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
                 !(codeElement.AccessedProperty.Type?.IsNullable ?? true) &&
                 !codeElement.AccessedProperty.ReadOnly &&
                 !string.IsNullOrEmpty(codeElement.AccessedProperty.DefaultValue))
-        {
-            writer.WriteLines(
-                $"val , err :=  m.{backingStore.NamePrefix}{backingStore.Name.ToFirstCharacterLowerCase()}.Get(\"{codeElement.AccessedProperty.Name.ToFirstCharacterLowerCase()}\")");
-            writer.WriteBlock("if err != nil {", "}", "panic(err)");
-            writer.WriteBlock("if val == nil {", "}",
-                $"var value = {codeElement.AccessedProperty.DefaultValue};",
-                $"m.Set{codeElement.AccessedProperty.Name?.ToFirstCharacterUpperCase()}(value);");
+            {
+                writer.WriteLines(
+                    $"val , err :=  m.{backingStore.NamePrefix}{backingStore.Name.ToFirstCharacterLowerCase()}.Get(\"{codeElement.AccessedProperty.Name.ToFirstCharacterLowerCase()}\")");
+                writer.WriteBlock("if err != nil {", "}", "panic(err)");
+                writer.WriteBlock("if val == nil {", "}",
+                    $"var value = {codeElement.AccessedProperty.DefaultValue};",
+                    $"m.Set{codeElement.AccessedProperty.Name?.ToFirstCharacterUpperCase()}(value);");
 
-            writer.WriteLine($"return val.({conventions.GetTypeString(codeElement.AccessedProperty.Type, parentClass)})");
-        }
-        else
-        {
-            var returnType = conventions.GetTypeString(codeElement.ReturnType, parentClass);
+                writer.WriteLine($"return val.({conventions.GetTypeString(codeElement.AccessedProperty.Type, parentClass)})");
+            }
+            else
+            {
+                var returnType = conventions.GetTypeString(codeElement.ReturnType, parentClass);
 
-            writer.WriteLine($"val, err := m.Get{backingStore.Name.ToFirstCharacterUpperCase()}().Get(\"{codeElement.AccessedProperty?.Name?.ToFirstCharacterLowerCase()}\")");
+                writer.WriteLine($"val, err := m.Get{backingStore.Name.ToFirstCharacterUpperCase()}().Get(\"{codeElement.AccessedProperty?.Name?.ToFirstCharacterLowerCase()}\")");
 
-            writer.WriteBlock("if err != nil {", "}", "panic(err)");
-            writer.WriteBlock("if val != nil {", "}", $"return val.({returnType})");
+                writer.WriteBlock("if err != nil {", "}", "panic(err)");
+                writer.WriteBlock("if val != nil {", "}", $"return val.({returnType})");
 
-            writer.WriteLine("return nil");
-        }
+                writer.WriteLine("return nil");
+            }
     }
     private void WriteApiConstructorBody(CodeClass parentClass, CodeMethod method, LanguageWriter writer)
     {
@@ -571,14 +574,6 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         }
         writer.CloseBlock(decreaseIndent: false);
 
-        // Handle error message parameter for error classes
-        if (parentClass.IsErrorDefinition && currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) is CodeParameter messageParam)
-        {
-            if (parentClass.GetPrimaryMessageCodePath(static x => x.Name.ToFirstCharacterUpperCase(), static x => "Set" + x.Name.ToFirstCharacterUpperCase()) is string primaryMessageSetter && !string.IsNullOrEmpty(primaryMessageSetter))
-            {
-                writer.WriteLine($"m.{primaryMessageSetter}(&{messageParam.Name.ToFirstCharacterLowerCase()})");
-            }
-        }
         foreach (var propWithDefault in parentClass.GetPropertiesOfKind(CodePropertyKind.BackingStore,
                                                                         CodePropertyKind.RequestBuilder)
                                         .Where(static x => !string.IsNullOrEmpty(x.DefaultValue))
@@ -618,6 +613,14 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             }
             var setterName = propWithDefault.SetterFromCurrentOrBaseType?.Name.ToFirstCharacterUpperCase() is string sName && !string.IsNullOrEmpty(sName) ? sName : $"Set{propWithDefault.Name.ToFirstCharacterUpperCase()}";
             writer.WriteLine($"m.{setterName}({defaultValueReference})");
+        }
+        // Handle error message parameter for error classes
+        if (parentClass.IsErrorDefinition && currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) is CodeParameter messageParam)
+        {
+            if (parentClass.GetPrimaryMessageCodePath(static x => x.Name.ToFirstCharacterUpperCase(), static x => "Set" + x.Name.ToFirstCharacterUpperCase()) is string primaryMessageSetter && !string.IsNullOrEmpty(primaryMessageSetter))
+            {
+                writer.WriteLine($"m.{primaryMessageSetter}(&{messageParam.Name.ToFirstCharacterLowerCase()})");
+            }
         }
         if (parentClass.IsOfKind(CodeClassKind.RequestBuilder) && currentMethod.IsOfKind(CodeMethodKind.Constructor) &&
             currentMethod.Parameters.OfKind(CodeParameterKind.PathParameters) is CodeParameter pathParametersParam &&
