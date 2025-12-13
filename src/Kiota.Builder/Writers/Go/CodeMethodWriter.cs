@@ -455,7 +455,7 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         var methodName = code.Kind switch
         {
             CodeMethodKind.Constructor when code.Parameters.Any(p => p.IsOfKind(CodeParameterKind.ErrorMessage))
-                => code.Name.ToFirstCharacterLowerCase(),
+                => code.Name.ToFirstCharacterUpperCase(), // the refiner should have generated a sensible name already
             CodeMethodKind.Constructor when parentBlock is CodeClass parentClass && parentClass.IsOfKind(CodeClassKind.RequestBuilder)
                 => $"New{parentClass.Name.ToFirstCharacterUpperCase()}Internal", // internal instantiation with url template parameters
             CodeMethodKind.Factory => $"Create{parentBlock.Name.ToFirstCharacterUpperCase()}FromDiscriminatorValue",
@@ -574,6 +574,16 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         }
         writer.CloseBlock(decreaseIndent: false);
 
+        // Handle error message parameter for error classes - set the Message field on the parent ApiError
+        if (parentClass.IsErrorDefinition && currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) is CodeParameter messageParam)
+        {
+            var parentClassName = parentClass.StartBlock.Inherits?.Name.ToFirstCharacterUpperCase();
+            if (!string.IsNullOrEmpty(parentClassName))
+            {
+                writer.WriteLine($"m.{parentClassName}.Message = *{messageParam.Name.ToFirstCharacterLowerCase()}");
+            }
+        }
+
         foreach (var propWithDefault in parentClass.GetPropertiesOfKind(CodePropertyKind.BackingStore,
                                                                         CodePropertyKind.RequestBuilder)
                                         .Where(static x => !string.IsNullOrEmpty(x.DefaultValue))
@@ -613,14 +623,6 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             }
             var setterName = propWithDefault.SetterFromCurrentOrBaseType?.Name.ToFirstCharacterUpperCase() is string sName && !string.IsNullOrEmpty(sName) ? sName : $"Set{propWithDefault.Name.ToFirstCharacterUpperCase()}";
             writer.WriteLine($"m.{setterName}({defaultValueReference})");
-        }
-        // Handle error message parameter for error classes
-        if (parentClass.IsErrorDefinition && currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)) is CodeParameter messageParam)
-        {
-            if (parentClass.GetPrimaryMessageCodePath(static x => x.Name.ToFirstCharacterUpperCase(), static x => "Set" + x.Name.ToFirstCharacterUpperCase()) is string primaryMessageSetter && !string.IsNullOrEmpty(primaryMessageSetter))
-            {
-                writer.WriteLine($"m.{primaryMessageSetter}(&{messageParam.Name.ToFirstCharacterLowerCase()})");
-            }
         }
         if (parentClass.IsOfKind(CodeClassKind.RequestBuilder) && currentMethod.IsOfKind(CodeMethodKind.Constructor) &&
             currentMethod.Parameters.OfKind(CodeParameterKind.PathParameters) is CodeParameter pathParametersParam &&
