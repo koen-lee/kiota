@@ -454,10 +454,14 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         var isConstructor = code.IsOfKind(CodeMethodKind.Constructor, CodeMethodKind.ClientConstructor, CodeMethodKind.RawUrlConstructor);
         var methodName = code.Kind switch
         {
-            CodeMethodKind.Constructor when code.Parameters.Any(p => p.IsOfKind(CodeParameterKind.ErrorMessage))
-                => code.Name.ToFirstCharacterUpperCase(), // the refiner should have generated a sensible name already
+            // Error class constructors: generate names based on parameters
+            CodeMethodKind.Constructor when parentBlock is CodeClass { IsErrorDefinition: true } errorClass && code.Parameters.Any(p => p.IsOfKind(CodeParameterKind.ErrorMessage))
+                => $"New{errorClass.Name.ToFirstCharacterUpperCase()}WithMessage",
+            CodeMethodKind.Constructor when parentBlock is CodeClass { IsErrorDefinition: true }
+                => $"New{parentBlock.Name.ToFirstCharacterUpperCase()}",
+            // RequestBuilder constructors with parameters
             CodeMethodKind.Constructor when parentBlock is CodeClass parentClass && parentClass.IsOfKind(CodeClassKind.RequestBuilder)
-                => $"New{parentClass.Name.ToFirstCharacterUpperCase()}Internal", // internal instantiation with url template parameters
+                => $"New{parentClass.Name.ToFirstCharacterUpperCase()}Internal",
             CodeMethodKind.Factory => $"Create{parentBlock.Name.ToFirstCharacterUpperCase()}FromDiscriminatorValue",
             _ when isConstructor => $"New{parentBlock.Name.ToFirstCharacterUpperCase()}",
             _ when code.Access == AccessModifier.Public => code.Name.ToFirstCharacterUpperCase(),
