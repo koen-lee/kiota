@@ -78,9 +78,9 @@ public class PhpRefiner : CommonLanguageRefiner
                 "ApiException",
                 AbstractionsNamespaceName
             );
-            AddConstructorsForErrorClasses(generatedCode);
             MoveClassesWithNamespaceNamesUnderNamespace(generatedCode);
             AddConstructorsForDefaultValues(generatedCode, true);
+            AddConstructorsForErrorClasses(generatedCode); // Run after AddConstructorsForDefaultValues so we can add message parameter to existing constructor
             cancellationToken.ThrowIfCancellationRequested();
             cancellationToken.ThrowIfCancellationRequested();
             CorrectParameterType(generatedCode);
@@ -477,42 +477,18 @@ public class PhpRefiner : CommonLanguageRefiner
     {
         if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
-            // Add parameterless constructor if not exists
-            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && !m.Parameters.Any()))
-            {
-                var parameterlessConstructor = new CodeMethod
-                {
-                    Name = "__construct",
-                    Kind = CodeMethodKind.Constructor,
-                    Access = AccessModifier.Public,
-                    IsAsync = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "Instantiates a new {TypeName}."
-                    },
-                    ReturnType = new CodeType { Name = "void", IsExternal = true }
-                };
-                codeClass.AddMethod(parameterlessConstructor);
-            }
-
             var messageParameter = CreateErrorMessageParameter("string");
-            // Add constructor with message parameter if not exists
-            if (!codeClass.Methods.Any(static m => m.IsOfKind(CodeMethodKind.Constructor) && m.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage))))
+            // PHP only allows one __construct method, so we add an optional message parameter to the existing constructor
+            // The constructor may already exist from AddConstructorsForDefaultValues
+            var existingConstructor = codeClass.Methods.FirstOrDefault(static m => m.IsOfKind(CodeMethodKind.Constructor));
+            if (existingConstructor == null)
             {
-                var messageConstructor = new CodeMethod
-                {
-                    Name = "__construct",
-                    Kind = CodeMethodKind.Constructor,
-                    Access = AccessModifier.Public,
-                    IsAsync = false,
-                    Documentation = new()
-                    {
-                        DescriptionTemplate = "Instantiates a new {TypeName} with an error message."
-                    },
-                    ReturnType = new CodeType { Name = "void", IsExternal = true }
-                };
-                messageConstructor.AddParameter(messageParameter);
-                codeClass.AddMethod(messageConstructor);
+                existingConstructor = CreateConstructor(codeClass, "Instantiates a new {TypeName} and sets the default values.");
+                codeClass.AddMethod(existingConstructor);
+            }
+            if (!existingConstructor.Parameters.Any(static p => p.IsOfKind(CodeParameterKind.ErrorMessage)))
+            {
+                existingConstructor.AddParameter(messageParameter);
             }
 
             TryAddErrorMessageFactoryMethod(

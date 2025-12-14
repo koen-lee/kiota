@@ -125,6 +125,7 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
         var requestHeadersParameter = currentMethod.Parameters.OfKind(CodeParameterKind.Headers);
         var pathParametersProperty = parentClass.Properties.FirstOrDefaultOfKind(CodePropertyKind.PathParameters);
         var urlTemplateProperty = parentClass.Properties.FirstOrDefaultOfKind(CodePropertyKind.UrlTemplate);
+        var messageParameter = currentMethod.Parameters.FirstOrDefault(static p => p.IsOfKind(CodeParameterKind.ErrorMessage));
 
         if (parentClass.IsOfKind(CodeClassKind.RequestBuilder))
         {
@@ -132,6 +133,11 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PhpConventionServi
         }
         else if (parentClass.IsOfKind(CodeClassKind.RequestConfiguration))
             writer.WriteLine($"parent::__construct(${(requestHeadersParameter?.Name ?? "headers")} ?? [], ${(requestOptionParameter?.Name ?? "options")} ?? []);");
+        else if (parentClass.IsErrorDefinition && messageParameter != null)
+        {
+            // For error classes with optional message parameter, pass it to parent only if provided
+            writer.WriteLine($"parent::__construct(${messageParameter.Name} ?? '');");
+        }
         else
             writer.WriteLine("parent::__construct();");
 
