@@ -575,7 +575,6 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, PythonConventionSe
     }
     private void WriteDeserializerBodyForInheritedModel(bool inherits, CodeMethod codeElement, CodeClass parentClass, LanguageWriter writer)
     {
-        _codeUsingWriter.WriteInternalImports(parentClass, writer);
         writer.StartBlock($"fields: dict[str, Callable[[Any], {NoneKeyword}]] = {{");
         foreach (var otherProp in parentClass
                                         .GetPropertiesOfKind(CodePropertyKind.Custom)

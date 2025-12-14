@@ -477,7 +477,7 @@ public class PhpRefiner : CommonLanguageRefiner
     {
         if (codeElement is CodeClass codeClass && codeClass.IsErrorDefinition)
         {
-            var messageParameter = CreateErrorMessageParameter("string");
+            var messageParameter = CreateErrorMessageParameter("string", optional: true, defaultValue: "''");
             // PHP only allows one __construct method, so we add an optional message parameter to the existing constructor
             // The constructor may already exist from AddConstructorsForDefaultValues
             var existingConstructor = codeClass.Methods.FirstOrDefault(static m => m.IsOfKind(CodeMethodKind.Constructor));
